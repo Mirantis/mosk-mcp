@@ -204,7 +204,8 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
             enabled=settings.privacy_enabled,
         )
 
-    logger.info("server_initialized", tool_count=len(mcp._tool_manager._tools))
+    # FastMCP 3.x: list_tools() is async; tool count is not available in sync context
+    logger.info("server_initialized")
 
     return mcp
 
@@ -236,7 +237,7 @@ def _register_tools(
         async with LoggingContext(request_id=request_id, tool_name="health_check"):
             logger.debug("health_check_started")
 
-            checks: dict[str, Any] = {}
+            checks: dict[str, dict] = {}
 
             # Check basic functionality
             checks["server"] = {"status": "healthy", "message": "Server is running"}
@@ -262,6 +263,8 @@ def _register_tools(
             )
 
             logger.info("health_check_completed", status=status)
+
+#            import pdb; pdb.set_trace()
             return result
 
     # Server info tool

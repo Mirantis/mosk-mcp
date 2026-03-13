@@ -10,6 +10,7 @@ This module provides common fixtures used across the test suite:
 import os
 from collections.abc import Generator
 from datetime import UTC
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -17,6 +18,77 @@ import pytest
 from mosk_mcp.auth.types import Permission, Role, UserContext
 from mosk_mcp.core.config import Environment, LogFormat, LogLevel, Settings, TransportType
 
+# =============================================================================
+# FastMCP json_schema_type monkey patch (object with arbitrary fields → dict)
+# =============================================================================
+#
+# FastMCP's json_schema_to_type turns nested "object" schemas that have only
+# additionalProperties (no fixed "properties") into an empty dataclass, so
+# validated result.data in the tools tests may have no expected attributes
+# and the tests fail. Patch _schema_to_type to return dict[str, Any] for that
+# case until upstream fixes it.
+
+
+def _fastmcp_has_arbitrary_object_bug() -> bool:
+    """Return True if the current FastMCP still turns nested
+    object+additionalProperties into empty dataclass."""
+    from fastmcp.utilities.json_schema_type import json_schema_to_type
+    from fastmcp.utilities.types import get_cached_typeadapter
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "checks": {
+                "type": "object",
+                "additionalProperties": True,
+            },
+        },
+        "required": ["checks"],
+    }
+    try:
+        output_type = json_schema_to_type(schema)
+        adapter = get_cached_typeadapter(output_type)
+        data = adapter.validate_python({"checks": {"server": {"status": "ok"}}})
+        checks = getattr(data, "checks", None)
+        return not (isinstance(checks, dict) and "server" in checks)
+    except Exception:
+        return True  # Assume bug present if probe fails
+
+
+def _apply_fastmcp_json_schema_patch() -> None:
+    """Monkey-patch fastmcp so object schemas with only
+    additionalProperties become dict[str, Any]."""
+
+    import warnings
+
+    if not _fastmcp_has_arbitrary_object_bug():
+        warnings.warn(
+            "FastMCP json_schema arbitrary-object bug NOT detected; "
+            "skipping conftest monkey patch. You can remove this code since "
+            "you are using a fixed FastMCP release.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return
+
+    import fastmcp.utilities.json_schema_type as _json_schema_type
+
+    _original_schema_to_type = _json_schema_type._schema_to_type
+
+    def _patched_schema_to_type(schema: Any, schemas: Any) -> Any:
+        if (
+            schema.get("type") == "object"
+            and not schema.get("properties")
+            and schema.get("additionalProperties")
+        ):
+            return dict[str, Any]
+        return _original_schema_to_type(schema, schemas)
+
+    _json_schema_type._schema_to_type = _patched_schema_to_type
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Apply FastMCP json_schema patch before any tests run."""
+    _apply_fastmcp_json_schema_patch()
 
 # =============================================================================
 # Environment Fixtures
@@ -232,6 +304,25 @@ def mcp_server(default_settings: Settings):
     return create_mcp_server(default_settings)
 
 
+@pytest.fixture
+async def mcp_client(mcp_server):
+    """MCP client connected to the test server (in-process) for testing tools.
+
+    Uses FastMCP in-memory transport so the client talks to the server
+    in the same process. Use in async tests to call list_tools(), call_tool(), etc.
+
+    Example:
+        @pytest.mark.asyncio
+        async def test_health(mcp_client):
+            result = await mcp_client.call_tool("health_check", {})
+            assert result.data is not None
+    """
+    from fastmcp.client import Client
+
+    async with Client(transport=mcp_server) as client:
+        yield client
+
+
 # =============================================================================
 # Mock Fixtures
 # =============================================================================
@@ -280,3 +371,4 @@ def capture_logs() -> Generator[list[dict], None, None]:
 
     # Restore original configuration
     structlog.configure(processors=original_processors)
+
