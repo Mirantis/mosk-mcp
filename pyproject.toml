@@ -47,6 +47,7 @@ dependencies = [
     "starlette>=0.37.0",
     "uvicorn>=0.29.0",
     "prometheus-client>=0.20.0",
+    "httpx[socks]"
 ]
 
 [project.optional-dependencies]
