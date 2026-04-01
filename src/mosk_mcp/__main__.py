@@ -14,7 +14,7 @@ Usage:
     # With environment variables
     MCP_TRANSPORT=http MCP_HTTP_PORT=8080 mosk-mcp
 
-    # With .env file
+    # With .env file (override path with DOTENV_PATH=/path/to/.env)
     # Create .env file with configuration, then run:
     mosk-mcp
 """
@@ -42,6 +42,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Environment Variables:
+  DOTENV_PATH         Path to .env file for MCP_* settings (default: .env; not MCP_-prefixed)
   MCP_TRANSPORT       Transport type: stdio, http, streamable-http (default: stdio)
   MCP_HTTP_HOST       HTTP server host (default: 0.0.0.0)
   MCP_HTTP_PORT       HTTP server port (default: 8080)
@@ -57,6 +58,9 @@ Environment Variables:
 Examples:
   # Run with STDIO transport (for Claude Desktop)
   mosk-mcp
+
+  # Load MCP_* settings from a specific dotenv file
+  DOTENV_PATH=/path/to/config.env mosk-mcp
 
   # Run with HTTP transport
   MCP_TRANSPORT=http mosk-mcp

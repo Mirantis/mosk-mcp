@@ -5,7 +5,7 @@
 # and MCP server in the foreground.
 
 # Source the environment variables
-source "${DOTENV_FILE:-.env}"
+source "${DOTENV_PATH:-.env}"
 
 SOCKS_PROXY_PORT="${SOCKS_PROXY_PORT:-1080}"
 SOCKS_PROXY_URL=socks5://127.0.0.1:$SOCKS_PROXY_PORT

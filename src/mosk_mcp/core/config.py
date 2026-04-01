@@ -2,13 +2,14 @@
 
 This module provides centralized configuration management with support for:
 - Environment variables
-- .env files
+- .env files (path via ``DOTENV_PATH``, default ``.env``)
 - Default values with validation
 - Type-safe access to all settings
 """
 
 from __future__ import annotations
 
+import os
 import re
 from enum import Enum
 from functools import lru_cache
@@ -27,6 +28,17 @@ _URL_PATTERN = re.compile(
     r"(?:/.*)?$",  # optional path
     re.IGNORECASE,
 )
+
+# Path to dotenv file; not MCP_-prefixed so it can be set without reading .env first.
+_DOTENV_PATH_ENV = "DOTENV_PATH"
+_DEFAULT_DOTENV_FILE = ".env"
+
+
+def _resolve_dotenv_path() -> str | Path:
+    """Return path to the env file for pydantic-settings (default: .env)."""
+    raw = os.environ.get(_DOTENV_PATH_ENV, _DEFAULT_DOTENV_FILE)
+    s = raw.strip()
+    return _DEFAULT_DOTENV_FILE if not s else s
 
 
 class TransportType(str, Enum):
@@ -67,6 +79,9 @@ class Settings(BaseSettings):
 
     All settings can be configured via environment variables with the MCP_ prefix.
     For example, MCP_TRANSPORT=http sets the transport type.
+
+    The dotenv file path is not MCP_-prefixed: set DOTENV_PATH to an absolute or
+    relative path (default: .env in the current working directory).
 
     Authentication:
         This server uses SSO (Keycloak OIDC) for authentication.
@@ -109,7 +124,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="MCP_",
-        env_file=".env",
+        env_file=_resolve_dotenv_path(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

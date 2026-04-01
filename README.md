@@ -350,7 +350,15 @@ Server health and diagnostics.
 
 ## Configuration
 
-All settings use the `MCP_` prefix as environment variables.
+Most server settings use the `MCP_` prefix as environment variables.
+
+### Dotenv file
+
+`DOTENV_PATH` is intentionally **not** `MCP_`-prefixed: it chooses which file is loaded before applying `MCP_*` values from that file (default: `.env` in the current working directory).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DOTENV_PATH` | `.env` | Path to the dotenv file (relative or absolute) |
 
 ### Core Settings
 
@@ -362,13 +370,6 @@ All settings use the `MCP_` prefix as environment variables.
 | `MCP_TRANSPORT` | `stdio` | stdio, http, streamable-http |
 | `MCP_AUTH_ENABLED` | `true` | Enable OAuth 2.0 Device Flow authentication |
 | `MCP_METRICS_ENABLED` | `true` | Enable Prometheus metrics endpoint |
-
-### Cluster configuration (`clusters.yaml`)
-
-Override the default config file path and the active cluster profile without editing the file on disk.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
 | `MCP_CONFIG_PATH` | `~/.config/mosk-mcp/clusters.yaml` | Absolute path to the cluster definitions file |
 | `MCP_PROFILE` | *(from file)* | Active profile: must match a key under `clusters:` in `clusters.yaml`; ignored if unknown |
 
