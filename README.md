@@ -363,6 +363,15 @@ All settings use the `MCP_` prefix as environment variables.
 | `MCP_AUTH_ENABLED` | `true` | Enable OAuth 2.0 Device Flow authentication |
 | `MCP_METRICS_ENABLED` | `true` | Enable Prometheus metrics endpoint |
 
+### Cluster configuration (`clusters.yaml`)
+
+Override the default config file path and the active cluster profile without editing the file on disk.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_CONFIG_PATH` | `~/.config/mosk-mcp/clusters.yaml` | Absolute path to the cluster definitions file |
+| `MCP_PROFILE` | *(from file)* | Active profile: must match a key under `clusters:` in `clusters.yaml`; ignored if unknown |
+
 ### Device Flow (OAuth 2.0)
 
 | Variable | Default | Description |

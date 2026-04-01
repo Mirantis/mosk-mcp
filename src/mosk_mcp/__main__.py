@@ -51,6 +51,8 @@ Environment Variables:
   MCP_METRICS_ENABLED Enable Prometheus metrics (default: true)
   MCP_METRICS_HOST    Metrics server host (default: 0.0.0.0)
   MCP_METRICS_PORT    Metrics/health server port (default: 9090)
+  MCP_CONFIG_PATH     Path to clusters.yaml (default: ~/.config/mosk-mcp/clusters.yaml)
+  MCP_PROFILE         Active cluster profile name (must exist under clusters: in clusters.yaml)
 
 Examples:
   # Run with STDIO transport (for Claude Desktop)
