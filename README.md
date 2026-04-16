@@ -367,6 +367,7 @@ Most server settings use the `MCP_` prefix as environment variables.
 | `MCP_MCC_URL` | - | MCC URL (not needed if using `clusters.yaml`) |
 | `MCP_SSL_VERIFY` | `true` | Verify SSL certificates |
 | `MCP_LOG_LEVEL` | `INFO` | DEBUG, INFO, WARNING, ERROR |
+| `MCP_LOG_FORMAT`| `json` | Log format: json, console |
 | `MCP_TRANSPORT` | `stdio` | stdio, http, streamable-http |
 | `MCP_AUTH_ENABLED` | `true` | Enable OAuth 2.0 Device Flow authentication |
 | `MCP_METRICS_ENABLED` | `true` | Enable Prometheus metrics endpoint |
