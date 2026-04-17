@@ -21,18 +21,9 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from mosk_mcp.url_validation import validate_http_url
 
 logger = logging.getLogger(__name__)
-
-
-# Strict URL pattern - only https in production
-_URL_PATTERN = re.compile(
-    r"^https?://"
-    r"(?:[\w.-]+|\[[a-fA-F0-9:]+\])"
-    r"(?::\d{1,5})?"
-    r"(?:/.*)?$",
-    re.IGNORECASE,
-)
 
 # Cluster ID pattern - alphanumeric, hyphens, underscores only
 _CLUSTER_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,62}$", re.IGNORECASE)
@@ -160,12 +151,7 @@ class ClusterConfig(BaseModel):
         if not url:
             raise ValueError("URL cannot be empty")
 
-        if not _URL_PATTERN.match(url):
-            raise ValueError(
-                f"Invalid URL format: '{url}'. URL must start with http:// or https://"
-            )
-
-        return url.rstrip("/")
+        return validate_http_url(url)
 
     @field_validator("name", "description", mode="before")
     @classmethod

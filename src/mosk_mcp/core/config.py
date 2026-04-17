@@ -10,7 +10,6 @@ This module provides centralized configuration management with support for:
 from __future__ import annotations
 
 import os
-import re
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
@@ -20,16 +19,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, CliToggleFlag, SettingsConfigDict
 
 from mosk_mcp._version import __version__ as _PACKAGE_VERSION
-
-
-# URL validation pattern - matches http:// or https:// URLs
-_URL_PATTERN = re.compile(
-    r"^https?://"  # http:// or https://
-    r"(?:[\w.-]+|\[[a-fA-F0-9:]+\])"  # hostname or IPv6 in brackets
-    r"(?::\d{1,5})?"  # optional port
-    r"(?:/.*)?$",  # optional path
-    re.IGNORECASE,
-)
+from mosk_mcp.url_validation import validate_http_url
 
 # Path to dotenv file; not MCP_-prefixed so it can be set without reading .env first.
 _DOTENV_PATH_ENV = "DOTENV_PATH"
@@ -508,15 +498,7 @@ class Settings(BaseSettings):
         if not url:
             return None
 
-        # Validate URL format
-        if not _URL_PATTERN.match(url):
-            raise ValueError(
-                f"Invalid URL format: '{url}'. "
-                "URL must start with http:// or https:// and contain a valid hostname."
-            )
-
-        # Strip trailing slashes for consistency
-        return url.rstrip("/")
+        return validate_http_url(url)
 
     @model_validator(mode="after")
     def validate_auth_settings(self) -> Settings:
