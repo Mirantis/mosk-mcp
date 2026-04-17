@@ -208,6 +208,7 @@ echo "  Image:        ${IMAGE_NAME}"
 echo "  Tag:          ${IMAGE_TAG}"
 echo "  Target:       ${TARGET}"
 echo "  Full name:    ${FULL_IMAGE_NAME}"
+echo "  App version:  ${APP_VERSION}"
 if [ -n "$PLATFORM" ]; then
     echo "  Platforms:    ${PLATFORM}"
 else
@@ -223,6 +224,9 @@ echo ""
 # Change to project root
 cd "$PROJECT_ROOT"
 
+# OCI image version (single source: src/mosk_mcp/_version.py)
+APP_VERSION="$(python3 -c "from pathlib import Path; p = Path('src/mosk_mcp/_version.py'); exec(p.read_text()); print(__version__)")"
+
 # Determine build strategy
 if [ -n "$PLATFORM" ]; then
     # Multi-platform build with buildx
@@ -234,6 +238,7 @@ if [ -n "$PLATFORM" ]; then
         docker buildx build
         --target "$TARGET"
         --platform "$PLATFORM"
+        --build-arg "APP_VERSION=${APP_VERSION}"
         -t "$FULL_IMAGE_NAME"
         -f "Dockerfile"
     )
@@ -285,6 +290,7 @@ else
     BUILD_CMD=(
         docker build
         --target "$TARGET"
+        --build-arg "APP_VERSION=${APP_VERSION}"
         -t "$FULL_IMAGE_NAME"
         -f "Dockerfile"
     )

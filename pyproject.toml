@@ -1,6 +1,6 @@
 [project]
 name = "mosk-mcp"
-version = "0.1.0"
+dynamic = ["version"]
 description = "MCP Server for Mirantis OpenStack for Kubernetes (MOSK) operations"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -74,7 +74,7 @@ all = [
 ]
 
 [project.scripts]
-mosk-mcp = "mosk_mcp.__main__:main"
+mosk-mcp = "mosk_mcp.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/mirantis/mosk-mcp"
@@ -85,6 +85,9 @@ Issues = "https://github.com/mirantis/mosk-mcp/issues"
 [build-system]
 requires = ["hatchling>=1.21.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/mosk_mcp/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mosk_mcp"]

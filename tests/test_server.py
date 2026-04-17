@@ -4,6 +4,7 @@ import pytest
 
 from fastmcp.client import Client
 
+from mosk_mcp import __version__
 from mosk_mcp.core.config import Settings
 from mosk_mcp.core.exceptions import (
     AuthenticationError,
@@ -234,7 +235,7 @@ class TestServerModels:
         result = ServerHealthResult(
             status="healthy",
             timestamp="2024-01-01T00:00:00Z",
-            version="0.1.0",
+            version=__version__,
             checks={"server": {"status": "healthy"}},
         )
 
@@ -245,7 +246,7 @@ class TestServerModels:
         """Test ServerInfo model."""
         info = ServerInfo(
             name="mosk-mcp",
-            version="0.1.0",
+            version=__version__,
             transport="stdio",
             auth_enabled=True,
             capabilities=["template_generation"],

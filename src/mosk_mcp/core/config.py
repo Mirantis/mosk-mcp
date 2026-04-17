@@ -19,6 +19,8 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, CliToggleFlag, SettingsConfigDict
 
+from mosk_mcp._version import __version__ as _PACKAGE_VERSION
+
 
 # URL validation pattern - matches http:// or https:// URLs
 _URL_PATTERN = re.compile(
@@ -93,7 +95,7 @@ class Settings(BaseSettings):
     and ``MCP_PROFILE`` (active cluster id under ``clusters:``) are read by the cluster manager,
     not as Settings fields.
     """
-    # **CLI:** The ``mosk-mcp`` console script uses ``CliApp`` (see ``mosk_mcp.__main__``): kebab-case
+    # **CLI:** The ``mosk-mcp`` console script uses ``CliApp`` (see ``mosk_mcp.cli``): kebab-case
     # flags, ``cli_shortcuts`` for names like ``--host`` / ``--port``, and ``CliToggleFlag`` on
     # selected booleans for ``--no-auth`` / ``--no-metrics``-style switches.
 
@@ -107,7 +109,7 @@ class Settings(BaseSettings):
 
     # Application metadata
     app_name: str = "mosk-mcp"
-    app_version: str = "0.1.0"
+    app_version: str = _PACKAGE_VERSION
 
     # --- MCP transport (HTTP / stdio) ---
     transport: TransportType = Field(

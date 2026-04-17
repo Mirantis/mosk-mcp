@@ -37,10 +37,13 @@ RUN pip install --upgrade pip && \
 # =============================================================================
 FROM python:3.11-slim AS production
 
+# Default matches src/mosk_mcp/_version.py; scripts/docker-build.sh passes the value from that file.
+ARG APP_VERSION=0.1.0
+
 # Labels for container metadata
 LABEL org.opencontainers.image.title="MOSK MCP Server" \
     org.opencontainers.image.description="MCP Server for Mirantis OpenStack for Kubernetes operations" \
-    org.opencontainers.image.version="0.1.0" \
+    org.opencontainers.image.version="${APP_VERSION}" \
     org.opencontainers.image.vendor="Mirantis" \
     org.opencontainers.image.source="https://github.com/mirantis/mosk-mcp"
 

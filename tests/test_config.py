@@ -2,6 +2,7 @@
 
 import pytest
 
+from mosk_mcp import __version__
 from mosk_mcp.core.config import (
     Environment,
     LogFormat,
@@ -29,7 +30,7 @@ class TestSettings:
         )
 
         assert settings.app_name == "mosk-mcp"
-        assert settings.app_version == "0.1.0"
+        assert settings.app_version == __version__
         assert settings.transport == TransportType.STDIO
         assert settings.http_port == 8080
         assert settings.log_level == LogLevel.INFO

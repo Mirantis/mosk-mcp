@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic_settings import SettingsConfigDict
 
+from mosk_mcp import __version__
 from mosk_mcp.auth.types import Permission, Role, UserContext
 from mosk_mcp.core.config import Environment, LogFormat, LogLevel, Settings, TransportType
 
@@ -223,7 +224,7 @@ def production_settings() -> Settings:
     """
     return Settings(
         app_name="mosk-mcp",
-        app_version="0.1.0",
+        app_version=__version__,
         transport=TransportType.STDIO,
         log_level=LogLevel.INFO,
         log_format=LogFormat.JSON,
