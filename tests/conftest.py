@@ -14,6 +14,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic_settings import SettingsConfigDict
 
 from mosk_mcp.auth.types import Permission, Role, UserContext
 from mosk_mcp.core.config import Environment, LogFormat, LogLevel, Settings, TransportType
@@ -27,7 +28,6 @@ from mosk_mcp.core.config import Environment, LogFormat, LogLevel, Settings, Tra
 # validated result.data in the tools tests may have no expected attributes
 # and the tests fail. Patch _schema_to_type to return dict[str, Any] for that
 # case until upstream fixes it.
-
 
 def _fastmcp_has_arbitrary_object_bug() -> bool:
     """Return True if the current FastMCP still turns nested
@@ -86,8 +86,21 @@ def _apply_fastmcp_json_schema_patch() -> None:
 
     _json_schema_type._schema_to_type = _patched_schema_to_type
 
+
+def _patch_settings_env_file_for_pytest() -> None:
+    """Monkey-patch ``Settings.model_config`` so ``env_file`` is ``None``.
+
+    Stops pydantic-settings from loading a project ``.env`` during tests; values
+    come from Field defaults and ``MCP_*`` environment variables only.
+    """
+    merged = dict(Settings.model_config)
+    merged["env_file"] = None
+    Settings.model_config = SettingsConfigDict(**merged)
+
+
 def pytest_configure(config: pytest.Config) -> None:
     """Apply FastMCP json_schema patch before any tests run."""
+    _patch_settings_env_file_for_pytest()
     _apply_fastmcp_json_schema_patch()
 
 # =============================================================================
@@ -109,7 +122,7 @@ def clean_environment() -> Generator[None, None, None]:
     mcp_vars = [key for key in os.environ if key.startswith("MCP_")]
     for var in mcp_vars:
         del os.environ[var]
-
+    
     yield
 
     # Restore original environment

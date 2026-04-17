@@ -350,29 +350,59 @@ Server health and diagnostics.
 
 ## Configuration
 
-Most server settings use the `MCP_` prefix as environment variables.
+Server options are loaded from defaults, optional `.env`, process environment variables, and (when you run the `mosk-mcp` / `python -m mosk_mcp` entrypoint) **command-line flags**. Field names map to env vars with the `MCP_` prefix (see `Settings` in `src/mosk_mcp/core/config.py`).
 
 ### Dotenv file
 
-`DOTENV_PATH` is intentionally **not** `MCP_`-prefixed: it chooses which file is loaded before applying `MCP_*` values from that file (default: `.env` in the current working directory).
+`DOTENV_PATH` is intentionally **not** `MCP_`-prefixed: it selects which file is merged before other sources (default: `.env` in the **current working directory** when the process starts).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DOTENV_PATH` | `.env` | Path to the dotenv file (relative or absolute) |
 
-### Core Settings
+### Configuration precedence
+
+When using the **`mosk-mcp`** console script (or `python -m mosk_mcp`), **explicit CLI flags override** environment variables, which override values from `.env`, which override built-in defaults. Run `mosk-mcp --help` for the full list of flags (pydantic-settings builds them from the settings model; options use kebab-case, e.g. `--log-level`).
+
+Common flags and **shortcuts** (equivalent env vars in parentheses):
+
+| Flag | Env var | Description |
+|------|---------|-------------|
+| `--version` | — | Print version and exit |
+| `--transport` | `MCP_TRANSPORT` | `stdio`, `http`, or `streamable-http` |
+| `--http-host`, **`--host`** | `MCP_HTTP_HOST` | HTTP MCP bind address (HTTP transports only) |
+| `--http-port`, **`--port`** | `MCP_HTTP_PORT` | HTTP MCP port |
+| `--log-level` | `MCP_LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `--log-format` | `MCP_LOG_FORMAT` | `json` or `console` |
+| `--environment` | `MCP_ENVIRONMENT` | `development`, `staging`, or `production` (server process) |
+| `--auth-enabled`, **`--no-auth`** | `MCP_AUTH_ENABLED` | Toggle OAuth Device Flow auth (`--no-auth` disables; dev only) |
+| `--metrics-enabled`, **`--no-metrics`** | `MCP_METRICS_ENABLED` | Toggle Prometheus metrics and shared health endpoints |
+| `--metrics-port` | `MCP_METRICS_PORT` | Metrics/health listen port |
+| `--metrics-host` | `MCP_METRICS_HOST` | Metrics/health bind address |
+
+### Core environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_MCC_URL` | - | MCC URL (not needed if using `clusters.yaml`) |
-| `MCP_SSL_VERIFY` | `true` | Verify SSL certificates |
-| `MCP_LOG_LEVEL` | `INFO` | DEBUG, INFO, WARNING, ERROR |
-| `MCP_LOG_FORMAT`| `json` | Log format: json, console |
-| `MCP_TRANSPORT` | `stdio` | stdio, http, streamable-http |
+| `MCP_MCC_URL` | — | MCC base URL (not required when using multi-cluster `clusters.yaml`) |
+| `MCP_SSL_VERIFY` | `true` | Verify TLS for HTTPS calls to MCC and APIs |
+| `MCP_SSL_CA_CERT_PATH` | — | Optional path to extra CA bundle (corporate roots) |
+| `MCP_ENVIRONMENT` | `development` | Server process mode: `development`, `staging`, or `production` (affects auth and production checks; distinct from per-cluster `environment` in `clusters.yaml`) |
+| `MCP_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `MCP_LOG_FORMAT` | `json` | `json` or `console` |
+| `MCP_TRANSPORT` | `stdio` | `stdio`, `http`, `streamable-http` |
+| `MCP_HTTP_HOST` | `0.0.0.0` | Bind address for HTTP / streamable-http MCP transport |
+| `MCP_HTTP_PORT` | `8080` | TCP port for HTTP / streamable-http MCP transport |
 | `MCP_AUTH_ENABLED` | `true` | Enable OAuth 2.0 Device Flow authentication |
-| `MCP_METRICS_ENABLED` | `true` | Enable Prometheus metrics endpoint |
-| `MCP_CONFIG_PATH` | `~/.config/mosk-mcp/clusters.yaml` | Absolute path to the cluster definitions file |
-| `MCP_PROFILE` | *(from file)* | Active profile: must match a key under `clusters:` in `clusters.yaml`; ignored if unknown |
+| `MCP_METRICS_ENABLED` | `true` | Expose Prometheus metrics and health endpoints |
+| `MCP_METRICS_HOST` | `0.0.0.0` | Bind address for metrics/health server |
+| `MCP_METRICS_PORT` | `9090` | TCP port for metrics and health checks |
+| `MCP_CONFIG_PATH` | `~/.config/mosk-mcp/clusters.yaml` | Path to multi-cluster `clusters.yaml` |
+| `MCP_PROFILE` | *(optional)* | If set to a cluster id that exists under `clusters:` in that file, overrides the `active:` cluster for this process |
+
+`MCP_CONFIG_PATH` and `MCP_PROFILE` are read by the cluster manager from the environment (they are not required when using only `MCP_MCC_URL` and single-cluster workflows).
+
+Other tunables (optional service URLs, rate limits, OpenTelemetry, extra privacy flags, etc.) use the same `MCP_<FIELD_NAME>` pattern as the corresponding field on `Settings`.
 
 ### Device Flow (OAuth 2.0)
 
@@ -500,7 +530,7 @@ Claude: You have 3 configured clusters:
         - production-eu (production)
 
 You: "Switch to production-us"
-Claude: Switching from internal-cloud-us to internal-cloud-eu.
+Claude: Switching from lab to production-us.
         This is a PRODUCTION cluster. Session will be cleared.
         Confirm switch? [Yes/No]
 ```
@@ -598,6 +628,9 @@ Claude Desktop manages the container lifecycle automatically. Configure via `cla
 ## Development
 
 ```bash
+# CLI and env (local install)
+mosk-mcp --help
+
 # Run tests
 pytest tests/ -v
 
