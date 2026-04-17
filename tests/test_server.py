@@ -1,7 +1,6 @@
 """Tests for MCP server."""
 
 import pytest
-
 from fastmcp.client import Client
 
 from mosk_mcp import __version__
@@ -16,6 +15,7 @@ from mosk_mcp.core.exceptions import (
 from mosk_mcp.core.server import (
     create_mcp_server,
     handle_tool_error,
+    run_server,
 )
 from mosk_mcp.registration.models import ServerHealthResult, ServerInfo
 
@@ -72,9 +72,9 @@ class TestHealthCheckTool:
         assert result.data is not None
         data = result.data
 
-        assert getattr(data, "status") == "healthy"
-        assert getattr(data, "version") == default_settings.app_version
-        checks = getattr(data, "checks")
+        assert data.status == "healthy"
+        assert data.version == default_settings.app_version
+        checks = data.checks
         assert "server" in checks
         assert "config" in checks
 
@@ -84,11 +84,11 @@ class TestHealthCheckTool:
         result = await mcp_client.call_tool("health_check", {})
 
         assert result.data is not None
-        data = result.data 
-        
+        data = result.data
+
         from datetime import datetime
 
-        datetime.fromisoformat(getattr(data, "timestamp").replace("Z", "+00:00"))
+        datetime.fromisoformat(data.timestamp.replace("Z", "+00:00"))
 
 
 class TestServerInfoTool:
@@ -102,12 +102,12 @@ class TestServerInfoTool:
         result = await mcp_client.call_tool("server_info", {})
 
         assert result.data is not None
-        data = result.data 
+        data = result.data
 
-        assert getattr(data, "name") == default_settings.app_name
-        assert getattr(data, "version") == default_settings.app_version
-        assert getattr(data, "transport") == default_settings.transport.value
-        assert getattr(data, "auth_enabled") == default_settings.auth_enabled
+        assert data.name == default_settings.app_name
+        assert data.version == default_settings.app_version
+        assert data.transport == default_settings.transport.value
+        assert data.auth_enabled == default_settings.auth_enabled
 
     @pytest.mark.asyncio
     async def test_server_info_lists_capabilities(self, mcp_client: Client) -> None:
@@ -115,8 +115,8 @@ class TestServerInfoTool:
         result = await mcp_client.call_tool("server_info", {})
 
         assert result.data is not None
-        data = result.data 
-        
+        data = result.data
+
         expected_capabilities = [
             "template_generation",
             "node_lifecycle",
@@ -125,7 +125,7 @@ class TestServerInfoTool:
             "health",
             "troubleshooting",
         ]
-        capabilities = getattr(data, "capabilities")
+        capabilities = data.capabilities
         for cap in expected_capabilities:
             assert cap in capabilities
 
@@ -254,3 +254,11 @@ class TestServerModels:
 
         assert info.name == "mosk-mcp"
         assert "template_generation" in info.capabilities
+
+
+class TestRunServerSettings:
+    """Regression tests for run_server wiring to init_settings."""
+
+    def test_run_server_calls_init_settings(self) -> None:
+        """run_server must install process settings via init_settings."""
+        assert "init_settings" in run_server.__code__.co_names

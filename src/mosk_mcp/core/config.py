@@ -1,17 +1,16 @@
 """Configuration management for MOSK MCP Server using Pydantic Settings.
 
-This module provides centralized configuration management with support for:
-- Environment variables
-- .env files (path via ``DOTENV_PATH``, default ``.env``)
+Process-wide access uses :func:`init_settings` once at startup, then :func:`get_settings`.
+Loading rules for :class:`Settings` itself:
+- Environment variables (``MCP_*``)
+- ``.env`` file (path via ``DOTENV_PATH``, default ``.env``)
 - Default values with validation
-- Type-safe access to all settings
 """
 
 from __future__ import annotations
 
 import os
 from enum import Enum
-from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -81,14 +80,12 @@ class Settings(BaseSettings):
 
     **Authentication:** SSO via Keycloak OIDC (OAuth 2.0 Device Flow). Set ``MCP_MCC_URL``
     when not using multi-cluster ``clusters.yaml``; other endpoints are auto-discovered from
-    MCC ``config.js``. Multi-cluster: ``MCP_CONFIG_PATH`` (default ``~/.config/mosk-mcp/clusters.yaml``)
-    and ``MCP_PROFILE`` (active cluster id under ``clusters:``) are read by the cluster manager,
-    not as Settings fields.
+    MCC ``config.js``.
     """
     # **CLI:** The ``mosk-mcp`` console script uses ``CliApp`` (see ``mosk_mcp.cli``): kebab-case
     # flags, ``cli_shortcuts`` for names like ``--host`` / ``--port``, and ``CliToggleFlag`` on
     # selected booleans for ``--no-auth`` / ``--no-metrics``-style switches.
-
+   
     model_config = SettingsConfigDict(
         env_prefix="MCP_",
         env_file=_resolve_dotenv_path(),
@@ -387,6 +384,22 @@ class Settings(BaseSettings):
         description="Override OpenSearch/Kibana IAM proxy URL from MCC discovery.",
     )
 
+    # --- Multi-cluster (clusters.yaml) ---
+    config_path: Path | None = Field(
+        default=None,
+        description=(
+            "Path to ``clusters.yaml``. When unset, the cluster manager uses "
+            "``~/.config/mosk-mcp/clusters.yaml``."
+        ),
+    )
+    profile: str | None = Field(
+        default=None,
+        description=(
+            "Active cluster id under ``clusters:``; when set, overrides the ``active`` key in the "
+            "file after load."
+        ),
+    )
+
     ssl_verify: bool = Field(
         default=True,
         description=(
@@ -464,6 +477,26 @@ class Settings(BaseSettings):
         if isinstance(v, Path):
             return v
         return Path(str(v))
+
+    @field_validator("config_path", mode="before")
+    @classmethod
+    def validate_clusters_config_path(cls, v: Any) -> Path | None:
+        """Normalize multi-cluster config path; empty means use default file location."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, Path):
+            return v
+        s = str(v).strip()
+        return None if not s else Path(s)
+
+    @field_validator("profile", mode="before")
+    @classmethod
+    def validate_cluster_profile(cls, v: Any) -> str | None:
+        """Treat blank profile override as unset."""
+        if v is None or v == "":
+            return None
+        s = str(v).strip()
+        return None if not s else s
 
     @field_validator(
         "mcc_url",
@@ -628,25 +661,43 @@ class Settings(BaseSettings):
         return None
 
 
-@lru_cache
+_settings: Settings | None = None
+
+
+def init_settings(settings: Settings) -> None:
+    """Install the process-wide settings singleton.
+
+    Must be called exactly once before :func:`get_settings`. Typically invoked from the
+    server entrypoint with CLI/env-merged :class:`Settings` (or ``Settings()`` for env-only).
+
+    Raises:
+        RuntimeError: If called more than once per process (tests should call
+            :func:`reset_settings_for_testing` between scenarios).
+    """
+    global _settings
+    if _settings is not None:
+        raise RuntimeError("init_settings() has already been called")
+    _settings = settings
+
+
 def get_settings() -> Settings:
-    """Get cached application settings.
+    """Return the settings installed by :func:`init_settings`.
 
-    Returns:
-        Settings instance loaded from environment.
-
-    Note:
-        This function is cached to ensure settings are loaded only once.
-        To reload settings, clear the cache with get_settings.cache_clear().
+    Raises:
+        RuntimeError: If :func:`init_settings` has not been called yet.
     """
-    return Settings()
+    if _settings is None:
+        raise RuntimeError(
+            "get_settings() called before init_settings(); "
+            "call init_settings() from the application entrypoint first"
+        )
+    return _settings
 
 
-def reload_settings() -> Settings:
-    """Reload settings by clearing the cache.
+def reset_settings_for_testing() -> None:
+    """Clear the settings singleton so another :func:`init_settings` can run.
 
-    Returns:
-        Fresh Settings instance loaded from environment.
+    Intended for the test suite only; production code should not rely on re-initialization.
     """
-    get_settings.cache_clear()
-    return get_settings()
+    global _settings
+    _settings = None

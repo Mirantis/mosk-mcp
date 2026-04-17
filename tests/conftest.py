@@ -116,6 +116,9 @@ def clean_environment() -> Generator[None, None, None]:
     Removes MCP-related environment variables before each test
     to ensure tests don't interfere with each other.
     """
+    from mosk_mcp.core.config import reset_settings_for_testing
+
+    reset_settings_for_testing()
     # Store original environment
     original_env = os.environ.copy()
 
@@ -313,8 +316,10 @@ def admin_context() -> UserContext:
 @pytest.fixture
 def mcp_server(default_settings: Settings):
     """Create an MCP server for testing."""
+    from mosk_mcp.core.config import init_settings
     from mosk_mcp.core.server import create_mcp_server
 
+    init_settings(default_settings)
     return create_mcp_server(default_settings)
 
 
