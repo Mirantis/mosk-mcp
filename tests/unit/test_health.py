@@ -31,8 +31,6 @@ from mosk_mcp.observability.health import (
 def health_settings() -> Settings:
     """Create settings for health check tests."""
     return Settings(
-        app_name="mosk-mcp-test",
-        app_version="0.1.0-test",
         transport=TransportType.STDIO,
         log_level=LogLevel.DEBUG,
         log_format=LogFormat.CONSOLE,
@@ -211,7 +209,7 @@ class TestHealthChecker:
         result = await health_checker.check_liveness()
 
         assert result.status == HealthStatus.HEALTHY
-        assert result.version == "0.1.0-test"
+        assert result.version == __version__
         assert len(result.checks) == 1
         assert result.checks[0].name == "process"
         assert result.checks[0].status == HealthStatus.HEALTHY

@@ -1,5 +1,8 @@
 """Tests for configuration management."""
 
+import os
+from unittest.mock import patch
+
 import pytest
 
 from mosk_mcp import __version__
@@ -38,6 +41,21 @@ class TestSettings:
         assert settings.log_format == LogFormat.CONSOLE
         assert settings.auth_enabled is False
         assert settings.kubernetes_namespace == "default"
+
+    def test_app_metadata_not_from_env(self) -> None:
+        """``app_name`` / ``app_version`` are not loaded from ``MCP_*`` env."""
+        with patch.dict(
+            os.environ,
+            {"MCP_APP_NAME": "should-not-apply", "MCP_APP_VERSION": "99.0.0"},
+            clear=False,
+        ):
+            settings = Settings(
+                auth_enabled=False,
+                log_format=LogFormat.CONSOLE,
+                environment=Environment.DEVELOPMENT,
+            )
+        assert settings.app_name == "mosk-mcp"
+        assert settings.app_version == __version__
 
     def test_transport_enum_values(self) -> None:
         """Test transport enum values."""

@@ -16,7 +16,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic_settings import SettingsConfigDict
 
-from mosk_mcp import __version__
 from mosk_mcp.auth.types import Permission, Role, UserContext
 from mosk_mcp.core.config import Environment, LogFormat, LogLevel, Settings, TransportType
 
@@ -176,8 +175,6 @@ def default_settings() -> Settings:
     Uses development mode which doesn't require MCC URL.
     """
     return Settings(
-        app_name="mosk-mcp-test",
-        app_version="0.1.0-test",
         transport=TransportType.STDIO,
         log_level=LogLevel.DEBUG,
         log_format=LogFormat.CONSOLE,
@@ -191,8 +188,6 @@ def default_settings() -> Settings:
 def auth_enabled_settings() -> Settings:
     """Create settings with authentication enabled."""
     return Settings(
-        app_name="mosk-mcp-test",
-        app_version="0.1.0-test",
         transport=TransportType.STDIO,
         log_level=LogLevel.DEBUG,
         log_format=LogFormat.CONSOLE,
@@ -206,8 +201,6 @@ def auth_enabled_settings() -> Settings:
 def http_settings() -> Settings:
     """Create settings for HTTP transport."""
     return Settings(
-        app_name="mosk-mcp-test",
-        app_version="0.1.0-test",
         transport=TransportType.HTTP,
         http_host="127.0.0.1",
         http_port=8888,
@@ -226,8 +219,6 @@ def production_settings() -> Settings:
     Production mode requires MCC URL.
     """
     return Settings(
-        app_name="mosk-mcp",
-        app_version=__version__,
         transport=TransportType.STDIO,
         log_level=LogLevel.INFO,
         log_format=LogFormat.JSON,

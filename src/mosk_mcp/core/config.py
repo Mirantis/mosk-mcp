@@ -14,7 +14,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, CliToggleFlag, SettingsConfigDict
 
 from mosk_mcp._version import __version__ as _PACKAGE_VERSION
@@ -94,9 +94,17 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Application metadata
-    app_name: str = "mosk-mcp"
-    app_version: str = _PACKAGE_VERSION
+    @computed_field
+    @property
+    def app_name(self) -> str:
+        """Package name; not overridable via env, CLI, or config files."""
+        return "mosk-mcp"
+
+    @computed_field
+    @property
+    def app_version(self) -> str:
+        """Package version from build metadata; not user-configurable."""
+        return _PACKAGE_VERSION
 
     # --- MCP transport (HTTP / stdio) ---
     transport: TransportType = Field(

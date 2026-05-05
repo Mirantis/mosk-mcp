@@ -40,7 +40,7 @@ class TestCreateMcpServer:
         server = create_mcp_server(default_settings)
 
         assert server is not None
-        assert server.name == "mosk-mcp-test"
+        assert server.name == "mosk-mcp"
 
     @pytest.mark.asyncio
     async def test_create_server_registers_tools(self, mcp_client: Client) -> None:
