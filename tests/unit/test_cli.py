@@ -6,8 +6,15 @@ from unittest.mock import patch
 import pytest
 
 from mosk_mcp import __version__
-from mosk_mcp.cli import CLI_PROG_NAME, MoskMcpCliSettings, _is_version_only_invocation, main
+from mosk_mcp.cli import (
+    CLI_ALLOWED_FIELDS,
+    CLI_PROG_NAME,
+    MoskMcpCliSettings,
+    _is_version_only_invocation,
+    main,
+)
 from mosk_mcp.core.config import (
+    Settings,
     TransportType,
     _resolve_dotenv_path,
     get_settings,
@@ -58,3 +65,15 @@ def test_cli_port_overrides_mcp_http_port_env(monkeypatch: pytest.MonkeyPatch) -
 
     assert get_settings() is cli
     assert get_settings().http_port == 2222
+
+
+def test_non_cli_setting_flag_is_not_exposed() -> None:
+    """Non-whitelisted settings should not be available as CLI flags."""
+    with pytest.raises(SystemExit):
+        _parse_cli("--mcc-url", "https://example.com")
+
+
+def test_cli_allowed_fields_align_with_settings_model() -> None:
+    """Whitelist should only contain valid top-level Settings fields."""
+    unknown = CLI_ALLOWED_FIELDS.difference(Settings.model_fields.keys())
+    assert unknown == set()

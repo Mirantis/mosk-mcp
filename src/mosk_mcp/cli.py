@@ -7,8 +7,11 @@ and :class:`pydantic_settings.CliApp` (see :func:`main`).
 from __future__ import annotations
 
 import sys
+from typing import Any
 
-from pydantic_settings import CliApp, SettingsConfigDict
+from pydantic import BaseModel
+from pydantic.fields import FieldInfo
+from pydantic_settings import CliApp, CliSettingsSource, SettingsConfigDict
 
 from mosk_mcp._version import __version__
 from mosk_mcp.core.config import Settings, _resolve_dotenv_path
@@ -17,6 +20,31 @@ from mosk_mcp.observability.logging import get_logger, setup_logging
 
 CLI_PROG_NAME = "mosk-mcp"
 _VERSION_FLAGS = frozenset(("--version", "-V"))
+CLI_ALLOWED_FIELDS = frozenset(
+    {
+        "transport",
+        "http_host",
+        "http_port",
+        "log_level",
+        "log_format",
+        "auth_enabled",
+        "metrics_enabled",
+        "metrics_host",
+        "metrics_port",
+        "config_path",
+        "profile",
+    }
+)
+
+
+class WhitelistedCliSettingsSource(CliSettingsSource[Any]):
+    """CLI source that only exposes fields listed in ``CLI_ALLOWED_FIELDS``."""
+
+    def _sort_arg_fields(self, model: type[BaseModel]) -> list[tuple[str, FieldInfo]]:
+        fields = super()._sort_arg_fields(model)
+        if model is self.settings_cls:
+            return [(name, info) for name, info in fields if name in CLI_ALLOWED_FIELDS]
+        return fields
 
 
 class MoskMcpCliSettings(Settings):
@@ -67,6 +95,25 @@ class MoskMcpCliSettings(Settings):
             },
         },
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[Settings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
+        """Inject a CLI source that only registers whitelisted top-level fields."""
+        cli_settings = WhitelistedCliSettingsSource(settings_cls)
+        return (
+            cli_settings,
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+        )
 
     async def cli_cmd(self) -> None:
         """Run the MOSK MCP server (parsed settings are ``self``)."""
