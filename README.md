@@ -380,46 +380,121 @@ Common flags and **shortcuts** (equivalent env vars in parentheses):
 | `--metrics-port` | `MCP_METRICS_PORT` | Metrics/health listen port |
 | `--metrics-host` | `MCP_METRICS_HOST` | Metrics/health bind address |
 
-### Core environment variables
+### Environment Variables 
+
+All settings from `src/mosk_mcp/core/config.py` can be configured via environment variables using `MCP_<FIELD_NAME>` (for example, `transport` -> `MCP_TRANSPORT`).
+
+`MCP_CONFIG_PATH` and `MCP_PROFILE` are optional and mainly used for multi-cluster mode via `clusters.yaml`; single-cluster workflows can use `MCP_MCC_URL` directly.
+
+#### Transport and runtime
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_MCC_URL` | — | MCC base URL (not required when using multi-cluster `clusters.yaml`) |
-| `MCP_SSL_VERIFY` | `true` | Verify TLS for HTTPS calls to MCC and APIs |
-| `MCP_SSL_CA_CERT_PATH` | — | Optional path to extra CA bundle (corporate roots) |
-| `MCP_ENVIRONMENT` | `development` | Server process mode: `development`, `staging`, or `production` (affects auth and production checks; distinct from per-cluster `environment` in `clusters.yaml`) |
-| `MCP_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
-| `MCP_LOG_FORMAT` | `json` | `json` or `console` |
-| `MCP_TRANSPORT` | `stdio` | `stdio`, `http`, `streamable-http` |
-| `MCP_HTTP_HOST` | `0.0.0.0` | Bind address for HTTP / streamable-http MCP transport |
-| `MCP_HTTP_PORT` | `8080` | TCP port for HTTP / streamable-http MCP transport |
+| `MCP_TRANSPORT` | `stdio` | MCP transport: `stdio`, `http`, or `streamable-http` |
+| `MCP_HTTP_HOST` | `0.0.0.0` | Bind address for MCP HTTP server when using HTTP transports |
+| `MCP_HTTP_PORT` | `8080` | TCP port for MCP HTTP server when using HTTP transports |
+| `MCP_ENVIRONMENT` | `development` | Process mode: `development`, `staging`, or `production` |
+| `MCP_KUBERNETES_NAMESPACE` | `default` | Default Kubernetes namespace for namespace-targeted tools |
+| `MCP_MOSK_CLUSTER_NAME` | *(unset)* | Optional MOSK Cluster CR name on MCC; auto-discovered if unset |
+| `MCP_MOSK_CLUSTER_NAMESPACE` | *(unset)* | Optional namespace for MOSK Cluster/Machine CRs on MCC; auto-discovered if unset |
+| `MCP_REQUEST_TIMEOUT` | `30` | Default outbound HTTP/API timeout in seconds |
+| `MCP_MAX_RETRIES` | `3` | Maximum retry attempts for transient outbound request failures |
+
+#### Logging and audit
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_LOG_LEVEL` | `INFO` | Minimum log level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `MCP_LOG_FORMAT` | `json` | Log format: `json` or `console` |
+| `MCP_LOG_TO_STDERR_ONLY` | `true` | Send main logs to stderr only (recommended in containers) |
+| `MCP_AUDIT_ENABLED` | `true` | Enable audit event logging |
+| `MCP_AUDIT_LOG_PATH` | `/var/log/mosk-mcp/audit.log` | Audit log file path |
+| `MCP_AUDIT_ROTATION_ENABLED` | `true` | Enable audit log rotation |
+| `MCP_AUDIT_MAX_SIZE_MB` | `100` | Maximum audit log file size (MB) before rotation |
+| `MCP_AUDIT_BACKUP_COUNT` | `10` | Number of rotated audit files to keep |
+| `MCP_AUDIT_ROTATION_WHEN` | `midnight` | Rotation schedule keyword (for example `midnight`, `h`, `d`) |
+
+#### Authentication, MCC, and service endpoint discovery
+
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `MCP_AUTH_ENABLED` | `true` | Enable OAuth 2.0 Device Flow authentication |
-| `MCP_METRICS_ENABLED` | `true` | Expose Prometheus metrics and health endpoints |
+| `MCP_MCC_URL` | *(unset)* | MCC base URL; required in production unless resolved via cluster profile config |
+| `MCP_KEYCLOAK_URL` | *(unset)* | Optional Keycloak base URL override |
+| `MCP_KEYCLOAK_REALM` | *(unset)* | Optional Keycloak realm override |
+| `MCP_MCC_OIDC_CLIENT_ID` | *(unset)* | Optional OIDC client id override |
+| `MCP_PROMETHEUS_URL` | *(unset)* | Optional Prometheus IAM proxy URL override |
+| `MCP_ALERTMANAGER_URL` | *(unset)* | Optional Alertmanager IAM proxy URL override |
+| `MCP_OPENSEARCH_URL` | *(unset)* | Optional OpenSearch/Kibana IAM proxy URL override |
+
+#### TLS/SSL and cluster profile selection
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_SSL_VERIFY` | `true` | Verify TLS certificates for MCC/API HTTPS calls |
+| `MCP_SSL_CA_CERT_PATH` | *(unset)* | Optional custom CA bundle path |
+| `MCP_CONFIG_PATH` | *(unset)* | Path to `clusters.yaml` (runtime default if unset: `~/.config/mosk-mcp/clusters.yaml`) |
+| `MCP_PROFILE` | *(unset)* | Active cluster id override from `clusters.yaml` (`clusters:` key) |
+
+#### Metrics and health checks
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_METRICS_ENABLED` | `true` | Enable Prometheus metrics and shared health endpoints |
 | `MCP_METRICS_HOST` | `0.0.0.0` | Bind address for metrics/health server |
-| `MCP_METRICS_PORT` | `9090` | TCP port for metrics and health checks |
-| `MCP_CONFIG_PATH` | `~/.config/mosk-mcp/clusters.yaml` | Path to multi-cluster `clusters.yaml` |
-| `MCP_PROFILE` | *(optional)* | If set to a cluster id that exists under `clusters:` in that file, overrides the `active:` cluster for this process |
+| `MCP_METRICS_PORT` | `9090` | TCP port for metrics/health server |
+| `MCP_HEALTH_CHECK_TIMEOUT_SECONDS` | `10` | Per-probe health check timeout in seconds |
+| `MCP_HEALTH_CHECK_K8S_ENABLED` | `true` | Include Kubernetes API connectivity in health checks |
 
-`MCP_CONFIG_PATH` and `MCP_PROFILE` are read by the cluster manager from the environment (they are not required when using only `MCP_MCC_URL` and single-cluster workflows).
-
-Other tunables (optional service URLs, rate limits, OpenTelemetry, extra privacy flags, etc.) use the same `MCP_<FIELD_NAME>` pattern as the corresponding field on `Settings`.
-
-### Device Flow (OAuth 2.0)
+#### Rate limiting and graceful shutdown
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_DEVICE_FLOW_ENABLED` | `true` | Enable browser-based auth |
-| `MCP_DEVICE_FLOW_CLIENT_ID` | `kaas` | Keycloak client ID |
-| `MCP_DEVICE_FLOW_CODE_LIFESPAN` | `600` | Login code validity (seconds) |
+| `MCP_RATE_LIMIT_ENABLED` | `true` | Enable per-client rate limiting on HTTP transports |
+| `MCP_RATE_LIMIT_REQUESTS_PER_MINUTE` | `60` | Sustained per-client request limit per minute |
+| `MCP_RATE_LIMIT_BURST_SIZE` | `10` | Allowed burst above sustained rate |
+| `MCP_SHUTDOWN_TIMEOUT` | `60` | Max seconds to wait for in-flight work during shutdown |
+| `MCP_DRAIN_TIMEOUT` | `30` | Seconds to drain connections before force close |
 
-### Privacy Protection
-
-Automatic data redaction when using cloud LLM providers.
+#### Connection pool and circuit breaker
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_PRIVACY_ENABLED` | `false` | Enable privacy protection |
-| `MCP_PRIVACY_LEVEL` | `standard` | none, minimal, standard, aggressive |
+| `MCP_CONNECTION_POOL_SIZE` | `10` | Maximum concurrent connections in shared HTTP client pool |
+| `MCP_CONNECTION_POOL_TIMEOUT` | `30` | Seconds to wait when acquiring a pooled connection |
+| `MCP_CONNECTION_HEALTH_CHECK_INTERVAL` | `60` | Seconds between idle connection health checks |
+| `MCP_CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` | Consecutive failures before circuit opens |
+| `MCP_CIRCUIT_BREAKER_RECOVERY_TIMEOUT` | `30` | Seconds before half-open recovery attempts |
+
+#### OpenTelemetry
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_OTEL_ENABLED` | `false` | Enable trace export |
+| `MCP_OTEL_SERVICE_NAME` | `mosk-mcp` | Service name attached to spans |
+| `MCP_OTEL_EXPORTER_ENDPOINT` | *(unset)* | OTLP collector URL; required when `MCP_OTEL_ENABLED=true` |
+
+#### Device Flow (OAuth 2.0)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_DEVICE_FLOW_ENABLED` | `true` | Enable browser-based Device Flow login |
+| `MCP_DEVICE_FLOW_CLIENT_ID` | `kaas` | OAuth client id used for Device Flow |
+| `MCP_DEVICE_FLOW_CODE_LIFESPAN` | `600` | Device code lifetime in seconds |
+| `MCP_DEVICE_FLOW_POLL_INTERVAL` | `5` | Poll interval (seconds) while waiting for authorization |
+| `MCP_DEVICE_FLOW_MAX_POLL_ATTEMPTS` | `0` | Maximum poll attempts (`0` means unlimited until code expiry) |
+| `MCP_DEVICE_FLOW_SCOPE` | `openid profile email offline_access` | Space-separated OAuth scopes |
+
+#### Privacy redaction
+
+Automatic data redaction for tool outputs before they are sent to the LLM.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_PRIVACY_ENABLED` | `false` | Enable privacy redaction |
+| `MCP_PRIVACY_LEVEL` | `standard` | Redaction level: `none`, `minimal`, `standard`, `aggressive` |
+| `MCP_PRIVACY_REDACT_UUID` | `false` | Also redact UUIDs (implicitly true with aggressive profile behavior) |
+| `MCP_PRIVACY_PRESERVE_STRUCTURE` | `true` | Keep structured placeholders (for example `[IP-1]`) |
 
 ---
 
