@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 from fastmcp import FastMCP
 from pydantic import Field
 
-from mosk_mcp.core.config import Settings, TransportType, get_settings
+from mosk_mcp.core.config import Settings, TransportType, get_settings, init_settings
 from mosk_mcp.core.exceptions import (
     AuthenticationError,
     AuthorizationError,
@@ -46,7 +46,6 @@ from mosk_mcp.registration.tools import (
     register_troubleshooting_tools,
     register_validation_tools,
 )
-
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
@@ -99,7 +98,8 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
     based on the user's OIDC tokens.
 
     Args:
-        settings: Application settings. If None, loads from environment.
+        settings: Application settings. If None, uses :func:`get_settings` (requires
+            :func:`init_settings` to have been called first).
 
     Returns:
         Configured FastMCP server instance.
@@ -204,7 +204,8 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
             enabled=settings.privacy_enabled,
         )
 
-    logger.info("server_initialized", tool_count=len(mcp._tool_manager._tools))
+    # FastMCP 3.x: list_tools() is async; tool count is not available in sync context
+    logger.info("server_initialized")
 
     return mcp
 
@@ -236,7 +237,7 @@ def _register_tools(
         async with LoggingContext(request_id=request_id, tool_name="health_check"):
             logger.debug("health_check_started")
 
-            checks: dict[str, Any] = {}
+            checks: dict[str, dict] = {}
 
             # Check basic functionality
             checks["server"] = {"status": "healthy", "message": "Server is running"}
@@ -262,6 +263,8 @@ def _register_tools(
             )
 
             logger.info("health_check_completed", status=status)
+
+#            import pdb; pdb.set_trace()
             return result
 
     # Server info tool
@@ -503,12 +506,15 @@ async def run_server(settings: Settings | None = None) -> None:
     5. Clean up resources and exit
 
     Args:
-        settings: Application settings. If None, loads from environment.
+        settings: Application settings. If None, default :class:`Settings` is built from
+            environment and dotenv, then installed via :func:`init_settings` so :func:`get_settings`
+            matches the running server.
     """
     import asyncio
 
-    if settings is None:
-        settings = get_settings()
+    resolved = settings if settings is not None else Settings()
+    init_settings(resolved)
+    settings = get_settings()
 
     # Initialize shutdown manager first
     from mosk_mcp.infrastructure.shutdown import GracefulShutdownManager, set_shutdown_manager

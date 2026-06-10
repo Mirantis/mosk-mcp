@@ -22,7 +22,7 @@ class ServerHealthResult(BaseModel):
     status: str = Field(..., description="Health status: healthy, degraded, or unhealthy")
     timestamp: str = Field(..., description="ISO 8601 timestamp of the check")
     version: str = Field(..., description="Server version")
-    checks: dict[str, Any] = Field(
+    checks: dict[str, dict] = Field(
         default_factory=dict, description="Individual component health checks"
     )
 

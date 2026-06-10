@@ -17,7 +17,8 @@ from mosk_mcp.core.config import (
     Settings,
     TransportType,
     get_settings,
-    reload_settings,
+    init_settings,
+    reset_settings_for_testing,
 )
 
 
@@ -176,9 +177,8 @@ class TestEnvironmentValidation:
                 "MCP_MCC_URL": "https://example.com",
             },
             clear=False,
-        ):
-            with pytest.raises(ValueError, match="Authentication cannot be disabled in production"):
-                Settings()
+        ), pytest.raises(ValueError, match="Authentication cannot be disabled in production"):
+            Settings()
 
     def test_production_requires_mcc_url(self) -> None:
         """Test production mode requires MCC URL."""
@@ -327,31 +327,40 @@ class TestSettingsDefaults:
         assert settings.max_retries == 3
 
 
-class TestSettingsCaching:
-    """Tests for settings caching."""
+class TestInitSettings:
+    """Tests for init_settings / get_settings."""
 
-    def test_get_settings_cached(self) -> None:
-        """Test get_settings returns cached instance."""
-        # Clear any existing cache
-        get_settings.cache_clear()
+    def test_get_settings_returns_singleton_after_init(self) -> None:
+        s = Settings()
+        init_settings(s)
+        assert get_settings() is s
+        assert get_settings() is s
 
-        settings1 = get_settings()
-        settings2 = get_settings()
-        assert settings1 is settings2
+    def test_get_settings_before_init_raises(self) -> None:
+        with pytest.raises(RuntimeError, match="init_settings"):
+            get_settings()
 
-    def test_reload_settings_clears_cache(self) -> None:
-        """Test reload_settings returns new instance."""
-        # Clear any existing cache
-        get_settings.cache_clear()
+    def test_init_settings_twice_raises(self) -> None:
+        init_settings(Settings())
+        with pytest.raises(RuntimeError, match="already been called"):
+            init_settings(Settings())
 
-        settings1 = get_settings()
-        settings2 = reload_settings()
-        # Different instances
-        assert settings1 is not settings2
+    def test_reset_settings_for_testing_allows_second_init(self) -> None:
+        init_settings(Settings(http_port=1111))
+        assert get_settings().http_port == 1111
+        reset_settings_for_testing()
+        b = Settings(http_port=2222)
+        init_settings(b)
+        assert get_settings() is b
 
-        # New get_settings should return the reloaded instance
-        settings3 = get_settings()
-        assert settings2 is settings3
+    def test_reinit_reads_updated_env(self, env_vars: dict[str, str]) -> None:
+        """Changing env and re-init yields new Settings from env."""
+        env_vars["MCP_AUTH_ENABLED"] = "false"
+        env_vars["MCP_LOG_FORMAT"] = "console"
+        env_vars["MCP_ENVIRONMENT"] = "development"
+        env_vars["MCP_HTTP_PORT"] = "9123"
+        init_settings(Settings())
+        assert get_settings().http_port == 9123
 
 
 class TestNumericConstraints:

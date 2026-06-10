@@ -945,7 +945,8 @@ async def create_sso_server_context(
     Factory function for SSO-authenticated server context.
 
     Args:
-        settings: Application settings (uses get_settings() if None).
+        settings: Application settings (uses :func:`get_settings` if None; requires
+            :func:`init_settings` to have been called).
         config: Optional context configuration.
 
     Returns:

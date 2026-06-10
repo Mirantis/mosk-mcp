@@ -41,11 +41,12 @@ class TestCoreImports:
 
     def test_core_config(self) -> None:
         """Test core config imports."""
-        from mosk_mcp.core import Settings, TransportType, get_settings
+        from mosk_mcp.core import Settings, TransportType, get_settings, init_settings
 
         assert Settings is not None
         assert TransportType is not None
         assert callable(get_settings)
+        assert callable(init_settings)
 
     def test_core_server_context(self) -> None:
         """Test core server context imports."""

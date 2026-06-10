@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from mosk_mcp import __version__
 from mosk_mcp.core.config import Environment, LogFormat, LogLevel, Settings, TransportType
 from mosk_mcp.observability.health import (
     CheckResult,
@@ -30,8 +31,6 @@ from mosk_mcp.observability.health import (
 def health_settings() -> Settings:
     """Create settings for health check tests."""
     return Settings(
-        app_name="mosk-mcp-test",
-        app_version="0.1.0-test",
         transport=TransportType.STDIO,
         log_level=LogLevel.DEBUG,
         log_format=LogFormat.CONSOLE,
@@ -107,13 +106,13 @@ class TestHealthResponse:
         response = HealthResponse(
             status=HealthStatus.HEALTHY,
             timestamp="2024-01-01T00:00:00+00:00",
-            version="0.1.0",
+            version=__version__,
             checks=checks,
             uptime_seconds=100.5,
         )
 
         assert response.status == HealthStatus.HEALTHY
-        assert response.version == "0.1.0"
+        assert response.version == __version__
         assert len(response.checks) == 2
         assert response.uptime_seconds == 100.5
 
@@ -122,14 +121,14 @@ class TestHealthResponse:
         response = HealthResponse(
             status=HealthStatus.HEALTHY,
             timestamp="2024-01-01T00:00:00+00:00",
-            version="0.1.0",
+            version=__version__,
             checks=[],
             uptime_seconds=50.0,
         )
 
         data = response.model_dump()
         assert data["status"] == "healthy"
-        assert data["version"] == "0.1.0"
+        assert data["version"] == __version__
         assert data["uptime_seconds"] == 50.0
 
 
@@ -210,7 +209,7 @@ class TestHealthChecker:
         result = await health_checker.check_liveness()
 
         assert result.status == HealthStatus.HEALTHY
-        assert result.version == "0.1.0-test"
+        assert result.version == __version__
         assert len(result.checks) == 1
         assert result.checks[0].name == "process"
         assert result.checks[0].status == HealthStatus.HEALTHY

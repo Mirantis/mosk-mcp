@@ -10,13 +10,98 @@ This module provides common fixtures used across the test suite:
 import os
 from collections.abc import Generator
 from datetime import UTC
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic_settings import SettingsConfigDict
 
 from mosk_mcp.auth.types import Permission, Role, UserContext
 from mosk_mcp.core.config import Environment, LogFormat, LogLevel, Settings, TransportType
 
+# =============================================================================
+# FastMCP json_schema_type monkey patch (object with arbitrary fields → dict)
+# =============================================================================
+#
+# FastMCP's json_schema_to_type turns nested "object" schemas that have only
+# additionalProperties (no fixed "properties") into an empty dataclass, so
+# validated result.data in the tools tests may have no expected attributes
+# and the tests fail. Patch _schema_to_type to return dict[str, Any] for that
+# case until upstream fixes it.
+
+def _fastmcp_has_arbitrary_object_bug() -> bool:
+    """Return True if the current FastMCP still turns nested
+    object+additionalProperties into empty dataclass."""
+    from fastmcp.utilities.json_schema_type import json_schema_to_type
+    from fastmcp.utilities.types import get_cached_typeadapter
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "checks": {
+                "type": "object",
+                "additionalProperties": True,
+            },
+        },
+        "required": ["checks"],
+    }
+    try:
+        output_type = json_schema_to_type(schema)
+        adapter = get_cached_typeadapter(output_type)
+        data = adapter.validate_python({"checks": {"server": {"status": "ok"}}})
+        checks = getattr(data, "checks", None)
+        return not (isinstance(checks, dict) and "server" in checks)
+    except Exception:
+        return True  # Assume bug present if probe fails
+
+
+def _apply_fastmcp_json_schema_patch() -> None:
+    """Monkey-patch fastmcp so object schemas with only
+    additionalProperties become dict[str, Any]."""
+
+    import warnings
+
+    if not _fastmcp_has_arbitrary_object_bug():
+        warnings.warn(
+            "FastMCP json_schema arbitrary-object bug NOT detected; "
+            "skipping conftest monkey patch. You can remove this code since "
+            "you are using a fixed FastMCP release.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return
+
+    import fastmcp.utilities.json_schema_type as _json_schema_type
+
+    _original_schema_to_type = _json_schema_type._schema_to_type
+
+    def _patched_schema_to_type(schema: Any, schemas: Any) -> Any:
+        if (
+            schema.get("type") == "object"
+            and not schema.get("properties")
+            and schema.get("additionalProperties")
+        ):
+            return dict[str, Any]
+        return _original_schema_to_type(schema, schemas)
+
+    _json_schema_type._schema_to_type = _patched_schema_to_type
+
+
+def _patch_settings_env_file_for_pytest() -> None:
+    """Monkey-patch ``Settings.model_config`` so ``env_file`` is ``None``.
+
+    Stops pydantic-settings from loading a project ``.env`` during tests; values
+    come from Field defaults and ``MCP_*`` environment variables only.
+    """
+    merged = dict(Settings.model_config)
+    merged["env_file"] = None
+    Settings.model_config = SettingsConfigDict(**merged)
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Apply FastMCP json_schema patch before any tests run."""
+    _patch_settings_env_file_for_pytest()
+    _apply_fastmcp_json_schema_patch()
 
 # =============================================================================
 # Environment Fixtures
@@ -30,6 +115,9 @@ def clean_environment() -> Generator[None, None, None]:
     Removes MCP-related environment variables before each test
     to ensure tests don't interfere with each other.
     """
+    from mosk_mcp.core.config import reset_settings_for_testing
+
+    reset_settings_for_testing()
     # Store original environment
     original_env = os.environ.copy()
 
@@ -37,7 +125,7 @@ def clean_environment() -> Generator[None, None, None]:
     mcp_vars = [key for key in os.environ if key.startswith("MCP_")]
     for var in mcp_vars:
         del os.environ[var]
-
+    
     yield
 
     # Restore original environment
@@ -87,8 +175,6 @@ def default_settings() -> Settings:
     Uses development mode which doesn't require MCC URL.
     """
     return Settings(
-        app_name="mosk-mcp-test",
-        app_version="0.1.0-test",
         transport=TransportType.STDIO,
         log_level=LogLevel.DEBUG,
         log_format=LogFormat.CONSOLE,
@@ -102,8 +188,6 @@ def default_settings() -> Settings:
 def auth_enabled_settings() -> Settings:
     """Create settings with authentication enabled."""
     return Settings(
-        app_name="mosk-mcp-test",
-        app_version="0.1.0-test",
         transport=TransportType.STDIO,
         log_level=LogLevel.DEBUG,
         log_format=LogFormat.CONSOLE,
@@ -117,8 +201,6 @@ def auth_enabled_settings() -> Settings:
 def http_settings() -> Settings:
     """Create settings for HTTP transport."""
     return Settings(
-        app_name="mosk-mcp-test",
-        app_version="0.1.0-test",
         transport=TransportType.HTTP,
         http_host="127.0.0.1",
         http_port=8888,
@@ -137,8 +219,6 @@ def production_settings() -> Settings:
     Production mode requires MCC URL.
     """
     return Settings(
-        app_name="mosk-mcp",
-        app_version="0.1.0",
         transport=TransportType.STDIO,
         log_level=LogLevel.INFO,
         log_format=LogFormat.JSON,
@@ -227,9 +307,30 @@ def admin_context() -> UserContext:
 @pytest.fixture
 def mcp_server(default_settings: Settings):
     """Create an MCP server for testing."""
+    from mosk_mcp.core.config import init_settings
     from mosk_mcp.core.server import create_mcp_server
 
+    init_settings(default_settings)
     return create_mcp_server(default_settings)
+
+
+@pytest.fixture
+async def mcp_client(mcp_server):
+    """MCP client connected to the test server (in-process) for testing tools.
+
+    Uses FastMCP in-memory transport so the client talks to the server
+    in the same process. Use in async tests to call list_tools(), call_tool(), etc.
+
+    Example:
+        @pytest.mark.asyncio
+        async def test_health(mcp_client):
+            result = await mcp_client.call_tool("health_check", {})
+            assert result.data is not None
+    """
+    from fastmcp.client import Client
+
+    async with Client(transport=mcp_server) as client:
+        yield client
 
 
 # =============================================================================
@@ -280,3 +381,4 @@ def capture_logs() -> Generator[list[dict], None, None]:
 
     # Restore original configuration
     structlog.configure(processors=original_processors)
+

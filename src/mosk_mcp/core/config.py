@@ -1,32 +1,35 @@
 """Configuration management for MOSK MCP Server using Pydantic Settings.
 
-This module provides centralized configuration management with support for:
-- Environment variables
-- .env files
+Process-wide access uses :func:`init_settings` once at startup, then :func:`get_settings`.
+Loading rules for :class:`Settings` itself:
+- Environment variables (``MCP_*``)
+- ``.env`` file (path via ``DOTENV_PATH``, default ``.env``)
 - Default values with validation
-- Type-safe access to all settings
 """
 
 from __future__ import annotations
 
-import re
+import os
 from enum import Enum
-from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
-from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, computed_field, field_validator, model_validator
+from pydantic_settings import BaseSettings, CliToggleFlag, SettingsConfigDict
+
+from mosk_mcp._version import __version__ as _PACKAGE_VERSION
+from mosk_mcp.url_validation import validate_http_url
+
+# Path to dotenv file; not MCP_-prefixed so it can be set without reading .env first.
+_DOTENV_PATH_ENV = "DOTENV_PATH"
+_DEFAULT_DOTENV_FILE = ".env"
 
 
-# URL validation pattern - matches http:// or https:// URLs
-_URL_PATTERN = re.compile(
-    r"^https?://"  # http:// or https://
-    r"(?:[\w.-]+|\[[a-fA-F0-9:]+\])"  # hostname or IPv6 in brackets
-    r"(?::\d{1,5})?"  # optional port
-    r"(?:/.*)?$",  # optional path
-    re.IGNORECASE,
-)
+def _resolve_dotenv_path() -> str | Path:
+    """Return path to the env file for pydantic-settings (default: .env)."""
+    raw = os.environ.get(_DOTENV_PATH_ENV, _DEFAULT_DOTENV_FILE)
+    s = raw.strip()
+    return _DEFAULT_DOTENV_FILE if not s else s
 
 
 class TransportType(str, Enum):
@@ -55,231 +58,423 @@ class LogFormat(str, Enum):
 
 
 class Environment(str, Enum):
-    """Deployment environment."""
+    """Deployment environment for the MCP server process (logging, security rules).
+
+    Distinct from per-cluster ``safety_tier`` in ``clusters.yaml``. Used with
+    ``MCP_ENVIRONMENT`` to tune production vs development behavior.
+    """
 
     DEVELOPMENT = "development"
     STAGING = "staging"
     PRODUCTION = "production"
 
 
+PrivacyLevel = Literal["none", "minimal", "standard", "aggressive"]
+
+
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables.
+    """Application settings loaded from environment variables and optional ``.env`` file.
 
-    All settings can be configured via environment variables with the MCP_ prefix.
-    For example, MCP_TRANSPORT=http sets the transport type.
+    **Prefix:** Environment variables use ``MCP_<FIELD_NAME>`` (see ``model_config``).
+    **Dotenv:** ``DOTENV_PATH`` (not ``MCP_``-prefixed) selects the env file (default: ``.env``).
 
-    Authentication:
-        This server uses SSO (Keycloak OIDC) for authentication.
-        - Requires MCP_MCC_URL (e.g., https://mcc.example.com)
-        - Keycloak URL and other endpoints are auto-discovered from MCC config.js
-        - Each user authenticates with their own credentials via the `login` tool
-        - Kubeconfigs are generated dynamically from OIDC tokens
-        - Provides user-scoped permissions and audit trails
-
-    Attributes:
-        app_name: Application name for identification.
-        app_version: Application version string.
-        transport: MCP transport type (stdio, http, or streamable-http).
-        http_host: Host to bind HTTP server to.
-        http_port: Port for HTTP transport.
-        log_level: Logging level.
-        log_format: Log output format (json for production, console for development).
-        auth_enabled: Whether authentication is enabled (uses SSO Device Flow).
-        kubernetes_namespace: Default Kubernetes namespace for operations.
-        audit_log_path: Path for audit log file.
-        audit_enabled: Whether audit logging is enabled.
-        request_timeout: Default timeout for external requests in seconds.
-        max_retries: Maximum number of retries for failed operations.
-        otel_enabled: Whether OpenTelemetry tracing is enabled.
-        otel_service_name: Service name for OpenTelemetry.
-        otel_exporter_endpoint: OpenTelemetry exporter endpoint.
-        metrics_enabled: Whether Prometheus metrics are enabled.
-        metrics_port: Port for Prometheus metrics endpoint.
-        metrics_host: Host to bind metrics server to.
-        health_check_timeout_seconds: Timeout for health check operations.
-        health_check_k8s_enabled: Whether to check K8s connectivity in health checks.
-        mcc_url: MCC UI URL (required, e.g., https://mcc.example.com).
-        keycloak_url: Override for Keycloak server URL (auto-discovered from MCC).
-        keycloak_realm: Override for Keycloak realm name (auto-discovered from MCC).
-        mcc_oidc_client_id: Override for OIDC client ID (auto-discovered from MCC).
-        prometheus_url: Override for Prometheus IAM proxy URL (auto-discovered).
-        alertmanager_url: Override for Alertmanager IAM proxy URL (auto-discovered).
-        opensearch_url: Override for OpenSearch/Kibana IAM proxy URL (auto-discovered).
+    **Authentication:** SSO via Keycloak OIDC (OAuth 2.0 Device Flow). Set ``MCP_MCC_URL``
+    when not using multi-cluster ``clusters.yaml``; other endpoints are auto-discovered from
+    MCC ``config.js``.
     """
-
+    # **CLI:** The ``mosk-mcp`` console script uses ``CliApp`` (see ``mosk_mcp.cli``): kebab-case
+    # flags, ``cli_shortcuts`` for names like ``--host`` / ``--port``, and ``CliToggleFlag`` on
+    # selected booleans for ``--no-auth`` / ``--no-metrics``-style switches.
+   
     model_config = SettingsConfigDict(
         env_prefix="MCP_",
-        env_file=".env",
+        env_file=_resolve_dotenv_path(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
     )
 
-    # Application metadata
-    app_name: str = "mosk-mcp"
-    app_version: str = "0.1.0"
+    @computed_field
+    @property
+    def app_name(self) -> str:
+        """Package name; not overridable via env, CLI, or config files."""
+        return "mosk-mcp"
 
-    # MCP Transport settings
-    transport: TransportType = TransportType.STDIO
-    http_host: str = "0.0.0.0"
-    http_port: Annotated[int, Field(ge=1, le=65535)] = 8080
+    @computed_field
+    @property
+    def app_version(self) -> str:
+        """Package version from build metadata; not user-configurable."""
+        return _PACKAGE_VERSION
 
-    # Environment and logging settings
-    environment: Environment = Environment.DEVELOPMENT
-    log_level: LogLevel = LogLevel.INFO
-    log_format: LogFormat = LogFormat.JSON
+    # --- MCP transport (HTTP / stdio) ---
+    transport: TransportType = Field(
+        default=TransportType.STDIO,
+        description=(
+            "MCP wire transport. Use ``stdio`` for Claude Desktop and similar clients; "
+            "``http`` or ``streamable-http`` for network deployments."
+        ),
+    )
+    http_host: str = Field(
+        default="0.0.0.0",
+        description="Bind address for the HTTP MCP server when ``transport`` is ``http`` or ``streamable-http``.",
+    )
+    http_port: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=65535,
+            description="TCP port for the HTTP MCP server when using HTTP transports.",
+        ),
+    ] = 8080
 
-    # Authentication settings (SSO via Device Flow)
-    auth_enabled: bool = True
-
-    # Default namespace for operations
-    kubernetes_namespace: str = "default"
-
-    # MOSK cluster identification on MCC (for Machine CR queries)
-    # These are auto-discovered if not set, but can be overridden
-    mosk_cluster_name: str | None = None  # e.g., "mos" - the Cluster CR name
-    mosk_cluster_namespace: str | None = (
-        None  # e.g., "lab" - namespace where MOSK Cluster/Machines live
+    # --- Process environment & logging ---
+    environment: Environment = Field(
+        default=Environment.DEVELOPMENT,
+        description=(
+            "Deployment mode for this server process: affects security validation, production "
+            "detection, and logging. Not the same as per-cluster safety tier in ``clusters.yaml``."
+        ),
+    )
+    log_level: LogLevel = Field(
+        default=LogLevel.INFO,
+        description="Minimum log level (DEBUG, INFO, WARNING, ERROR, CRITICAL).",
+    )
+    log_format: LogFormat = Field(
+        default=LogFormat.JSON,
+        description=(
+            "``json`` for structured logs (typical in production); ``console`` for human-readable "
+            "output in development."
+        ),
     )
 
-    # Audit settings
-    audit_log_path: Path = Path("/var/log/mosk-mcp/audit.log")
-    audit_enabled: bool = True
-    audit_rotation_enabled: bool = True
-    audit_max_size_mb: Annotated[int, Field(ge=1, le=1000)] = 100
-    audit_backup_count: Annotated[int, Field(ge=0, le=100)] = 10
-    audit_rotation_when: str = "midnight"  # midnight, h (hourly), d (daily)
-
-    # Docker-friendly logging - logs go to stderr only (visible in `docker logs`)
-    # When True, file-based logging is disabled and all logs go to stderr
-    # This is the recommended setting for containerized deployments
-    log_to_stderr_only: bool = True
-
-    # Operation settings
-    request_timeout: Annotated[int, Field(ge=1, le=300)] = 30
-    max_retries: Annotated[int, Field(ge=0, le=10)] = 3
-
-    # OpenTelemetry settings
-    otel_enabled: bool = False
-    otel_service_name: str = "mosk-mcp"
-    otel_exporter_endpoint: str | None = None
-
-    # Metrics settings
-    metrics_enabled: bool = True
-    metrics_port: Annotated[int, Field(ge=1, le=65535)] = 9090
-    metrics_host: str = "0.0.0.0"
-
-    # Health check settings
-    health_check_timeout_seconds: Annotated[int, Field(ge=1, le=60)] = 10
-    health_check_k8s_enabled: bool = True
-
-    # Rate limiting settings
-    rate_limit_enabled: bool = True
-    rate_limit_requests_per_minute: Annotated[int, Field(ge=1, le=10000)] = 60
-    rate_limit_burst_size: Annotated[int, Field(ge=1, le=100)] = 10
-
-    # Graceful shutdown settings
-    shutdown_timeout: Annotated[int, Field(ge=5, le=300)] = 60
-    drain_timeout: Annotated[int, Field(ge=1, le=120)] = 30
-
-    # Connection pool settings
-    connection_pool_size: Annotated[int, Field(ge=1, le=50)] = 10
-    connection_pool_timeout: Annotated[int, Field(ge=5, le=120)] = 30
-    connection_health_check_interval: Annotated[int, Field(ge=10, le=300)] = 60
-
-    # Circuit breaker settings
-    circuit_breaker_failure_threshold: Annotated[int, Field(ge=1, le=20)] = 5
-    circuit_breaker_recovery_timeout: Annotated[int, Field(ge=5, le=300)] = 30
-
-    # SSO settings (Keycloak OIDC-based authentication)
-    # Users authenticate with Keycloak and kubeconfigs are generated dynamically
-
-    # MCC UI URL - the ONLY required setting
-    # All other endpoints (Keycloak, K8s API, StackLight) are auto-discovered from config.js
-    mcc_url: str | None = None  # MCC UI URL (e.g., https://mcc.example.com)
-
-    # Optional overrides - normally auto-discovered from MCC UI config.js
-    # Only set these if auto-discovery doesn't work for your environment
-    keycloak_url: str | None = None  # Override Keycloak server URL
-    keycloak_realm: str | None = None  # Override Keycloak realm (default: discovered or "iam")
-    mcc_oidc_client_id: str | None = None  # Override OIDC client ID (default: discovered or "kaas")
-    prometheus_url: str | None = None  # Override Prometheus IAM proxy URL
-    alertmanager_url: str | None = None  # Override Alertmanager IAM proxy URL
-    opensearch_url: str | None = None  # Override OpenSearch/Kibana IAM proxy URL
-
-    # SSL/TLS settings for API connections
-    # SECURITY: In production, ssl_verify should be True with proper CA certificates
-    ssl_verify: bool = (
-        True  # Verify SSL certificates (disable only for self-signed certs in dev/lab)
+    # --- Authentication (SSO / Device Flow) ---
+    auth_enabled: CliToggleFlag[bool] = Field(
+        default=True,
+        description=(
+            "When true, use OAuth 2.0 Device Flow (Keycloak) for user login. "
+            "Disabling is only for local development; production requires auth."
+        ),
     )
-    ssl_ca_cert_path: Path | None = None  # Path to CA certificate bundle for verification
 
-    # Device Flow Authentication Settings (OAuth 2.0 Device Authorization Grant - RFC 8628)
-    # Device Flow allows secure authentication without typing passwords in chat.
-    # Users authenticate via browser while MCP polls for the token.
-    #
-    # SECURITY: Device Flow is the recommended authentication method for CLI/chat tools.
-    # It avoids exposing credentials in chat history and supports MFA/2FA.
+    kubernetes_namespace: str = Field(
+        default="default",
+        description="Default Kubernetes namespace for tools that target a namespace.",
+    )
 
-    # Enable Device Flow authentication (recommended for production)
-    # When enabled, the login tool will use Device Flow instead of ROPC
-    device_flow_enabled: bool = True
+    mosk_cluster_name: str | None = Field(
+        default=None,
+        description='Optional MOSK Cluster CR name on MCC (e.g. ``"mos"``); auto-discovered if unset.',
+    )
+    mosk_cluster_namespace: str | None = Field(
+        default=None,
+        description="Namespace on MCC where MOSK Cluster/Machine CRs live; auto-discovered if unset.",
+    )
 
-    # OAuth client ID for Device Flow authentication
-    # Uses the standard MCC "kaas" client with Device Flow enabled
-    # This ensures tokens have the correct audience and iam_roles for K8s API access
-    device_flow_client_id: str = "kaas"
+    # --- Audit logging ---
+    audit_log_path: Path = Field(
+        default=Path("/var/log/mosk-mcp/audit.log"),
+        description="Filesystem path for the audit log (security-sensitive actions).",
+    )
+    audit_enabled: bool = Field(
+        default=True,
+        description="Enable writing audit events to ``audit_log_path``.",
+    )
+    audit_rotation_enabled: bool = Field(
+        default=True,
+        description="Rotate audit files by size/time when supported by the logging setup.",
+    )
+    audit_max_size_mb: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=1000,
+            description="Maximum audit log file size in MB before rotation.",
+        ),
+    ] = 100
+    audit_backup_count: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=100,
+            description="Number of rotated audit files to retain.",
+        ),
+    ] = 10
+    audit_rotation_when: str = Field(
+        default="midnight",
+        description="Rotation schedule keyword (e.g. ``midnight``, ``h`` hourly, ``d`` daily).",
+    )
 
-    # Device code lifespan in seconds (how long user has to complete authentication)
-    # Must match Keycloak client configuration
-    # Default: 600 seconds (10 minutes) - recommended for interactive use
-    device_flow_code_lifespan: Annotated[int, Field(ge=60, le=1800)] = 600
+    log_to_stderr_only: bool = Field(
+        default=True,
+        description=(
+            "If true, logs go to stderr only (ideal for Docker ``docker logs``); "
+            "disables separate file logging for the main logger."
+        ),
+    )
 
-    # Polling interval in seconds (how often MCP checks if user completed auth)
-    # Must be >= Keycloak's configured interval to avoid rate limiting
-    # Default: 5 seconds - balances responsiveness with server load
-    device_flow_poll_interval: Annotated[int, Field(ge=1, le=60)] = 5
+    # --- HTTP client / retries ---
+    request_timeout: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=300,
+            description="Default timeout in seconds for outbound HTTP/API requests.",
+        ),
+    ] = 30
+    max_retries: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=10,
+            description="Maximum retry attempts for transient failures on outbound requests.",
+        ),
+    ] = 3
 
-    # Maximum polling attempts before giving up
-    # 0 = unlimited (poll until device code expires)
-    # Set a limit to prevent indefinite waiting
-    device_flow_max_poll_attempts: Annotated[int, Field(ge=0, le=1000)] = 0
+    # --- OpenTelemetry ---
+    otel_enabled: bool = Field(
+        default=False,
+        description="Export traces when true; requires ``otel_exporter_endpoint``.",
+    )
+    otel_service_name: str = Field(
+        default="mosk-mcp",
+        description="Service name label attached to OpenTelemetry spans.",
+    )
+    otel_exporter_endpoint: str | None = Field(
+        default=None,
+        description="OTLP/HTTP or gRPC collector URL for traces (required if ``otel_enabled``).",
+    )
 
-    # OAuth scopes to request during Device Flow authentication
-    # offline_access: Enables long-lived refresh tokens
-    # openid, profile, email: Standard OIDC scopes for user info
-    device_flow_scope: str = "openid profile email offline_access"
+    # --- Metrics & health ---
+    metrics_enabled: CliToggleFlag[bool] = Field(
+        default=True,
+        description="Expose Prometheus metrics and shared health endpoints on ``metrics_host:metrics_port``.",
+    )
+    metrics_port: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=65535,
+            description="TCP port for Prometheus metrics and health checks.",
+        ),
+    ] = 9090
+    metrics_host: str = Field(
+        default="0.0.0.0",
+        description="Bind address for the metrics/health HTTP server.",
+    )
+    health_check_timeout_seconds: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=60,
+            description="Timeout in seconds for individual health check probes.",
+        ),
+    ] = 10
+    health_check_k8s_enabled: bool = Field(
+        default=True,
+        description="Whether Kubernetes API connectivity is included in health checks.",
+    )
 
-    # ==========================================================================
-    # Privacy & Data Protection Settings
-    # ==========================================================================
-    # These settings control what sensitive data is redacted from tool responses
-    # before being sent to LLM providers (Claude, OpenAI, etc.)
-    #
-    # IMPORTANT: When using public LLMs, sensitive infrastructure data (IPs,
-    # hostnames, credentials) could be exposed. Enable privacy protection to
-    # automatically redact this information from responses.
-    #
-    # Levels:
-    #   - none: No redaction (not recommended for public LLMs)
-    #   - minimal: Only redact secrets/credentials
-    #   - standard: Redact IPs, MACs, hostnames, secrets (recommended)
-    #   - aggressive: Also redact UUIDs (instance IDs, volume IDs)
+    # --- Rate limiting ---
+    rate_limit_enabled: bool = Field(
+        default=True,
+        description="Apply per-client rate limiting on HTTP transports when enabled.",
+    )
+    rate_limit_requests_per_minute: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=10000,
+            description="Sustained request rate limit per client per minute.",
+        ),
+    ] = 60
+    rate_limit_burst_size: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=100,
+            description="Burst allowance above the sustained rate.",
+        ),
+    ] = 10
 
-    # Enable privacy protection (default: disabled, enable with MCP_PRIVACY_ENABLED=true)
-    privacy_enabled: bool = False
+    # --- Graceful shutdown ---
+    shutdown_timeout: Annotated[
+        int,
+        Field(
+            ge=5,
+            le=300,
+            description="Seconds to wait for in-flight work during shutdown.",
+        ),
+    ] = 60
+    drain_timeout: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=120,
+            description="Seconds to wait when draining connections before force-close.",
+        ),
+    ] = 30
 
-    # Privacy protection level
-    # Options: none, minimal, standard, aggressive
-    privacy_level: str = "standard"
+    # --- Connection pool ---
+    connection_pool_size: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=50,
+            description="Maximum concurrent connections in the shared HTTP client pool.",
+        ),
+    ] = 10
+    connection_pool_timeout: Annotated[
+        int,
+        Field(
+            ge=5,
+            le=120,
+            description="Seconds to wait when acquiring a connection from the pool.",
+        ),
+    ] = 30
+    connection_health_check_interval: Annotated[
+        int,
+        Field(
+            ge=10,
+            le=300,
+            description="Interval in seconds between idle connection health checks.",
+        ),
+    ] = 60
 
-    # Redact UUIDs (instance IDs, volume IDs) - off by default in standard mode
-    # Enable for extra privacy when sharing with external LLMs
-    privacy_redact_uuid: bool = False
+    # --- Circuit breaker ---
+    circuit_breaker_failure_threshold: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=20,
+            description="Consecutive failures before the circuit opens.",
+        ),
+    ] = 5
+    circuit_breaker_recovery_timeout: Annotated[
+        int,
+        Field(
+            ge=5,
+            le=300,
+            description="Seconds to wait before attempting half-open recovery.",
+        ),
+    ] = 30
 
-    # Preserve data structure in output (show types like [IP-1], [HOST-2])
-    # If false, all redacted values become generic [REDACTED]
-    privacy_preserve_structure: bool = True
+    # --- MCC / SSO endpoints ---
+    mcc_url: str | None = Field(
+        default=None,
+        description=(
+            "MCC UI base URL (e.g. ``https://mcc.example.com``). Required in production when "
+            "not relying solely on multi-cluster config. Keycloak and other URLs are read from "
+            "MCC ``config.js`` when unset."
+        ),
+    )
+    keycloak_url: str | None = Field(
+        default=None,
+        description="Override Keycloak base URL if auto-discovery from MCC fails.",
+    )
+    keycloak_realm: str | None = Field(
+        default=None,
+        description='Override Keycloak realm (default from MCC is often ``"iam"``).',
+    )
+    mcc_oidc_client_id: str | None = Field(
+        default=None,
+        description='Override OIDC client id (MCC default is often ``"kaas"``).',
+    )
+    prometheus_url: str | None = Field(
+        default=None,
+        description="Override Prometheus IAM proxy URL (StackLight) from MCC discovery.",
+    )
+    alertmanager_url: str | None = Field(
+        default=None,
+        description="Override Alertmanager IAM proxy URL from MCC discovery.",
+    )
+    opensearch_url: str | None = Field(
+        default=None,
+        description="Override OpenSearch/Kibana IAM proxy URL from MCC discovery.",
+    )
+
+    # --- Multi-cluster (clusters.yaml) ---
+    config_path: Path | None = Field(
+        default=None,
+        description=(
+            "Path to ``clusters.yaml``. When unset, the cluster manager uses "
+            "``~/.config/mosk-mcp/clusters.yaml``."
+        ),
+    )
+    profile: str | None = Field(
+        default=None,
+        description=(
+            "Active cluster id under ``clusters:``; when set, overrides the ``active`` key in the "
+            "file after load."
+        ),
+    )
+
+    ssl_verify: bool = Field(
+        default=True,
+        description=(
+            "Verify TLS certificates for HTTPS calls to MCC and APIs. Set false only for "
+            "self-signed certs in dev/lab; prefer ``ssl_ca_cert_path`` when possible."
+        ),
+    )
+    ssl_ca_cert_path: Path | None = Field(
+        default=None,
+        description="Path to a CA bundle to trust (e.g. corporate root) in addition to system CAs.",
+    )
+
+    # --- OAuth 2.0 Device Flow (RFC 8628) ---
+    device_flow_enabled: bool = Field(
+        default=True,
+        description="Use browser-based Device Flow for login (recommended); disable only for special testing.",
+    )
+    device_flow_client_id: str = Field(
+        default="kaas",
+        description="Keycloak OAuth client id used for Device Flow (must match MCC ``kaas`` client).",
+    )
+    device_flow_code_lifespan: Annotated[
+        int,
+        Field(
+            ge=60,
+            le=1800,
+            description="Device code lifetime in seconds (should match Keycloak client settings).",
+        ),
+    ] = 600
+    device_flow_poll_interval: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=60,
+            description="Seconds between polls to Keycloak while waiting for user authorization.",
+        ),
+    ] = 5
+    device_flow_max_poll_attempts: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=1000,
+            description="Max poll attempts (0 = unlimited until the device code expires).",
+        ),
+    ] = 0
+    device_flow_scope: str = Field(
+        default="openid profile email offline_access",
+        description="Space-separated OAuth scopes for Device Flow (``offline_access`` enables refresh tokens).",
+    )
+
+    # --- Privacy (LLM response redaction) ---
+    privacy_enabled: bool = Field(
+        default=False,
+        description="Redact sensitive infrastructure data from tool outputs before LLMs see them.",
+    )
+    privacy_level: PrivacyLevel = Field(
+        default="standard",
+        description="Redaction profile: ``none``, ``minimal``, ``standard``, or ``aggressive``.",
+    )
+    privacy_redact_uuid: bool = Field(
+        default=False,
+        description="When true, also redact UUIDs (e.g. volume IDs); implied by aggressive level.",
+    )
+    privacy_preserve_structure: bool = Field(
+        default=True,
+        description="Keep placeholder tokens like ``[IP-1]`` vs replacing all with ``[REDACTED]``.",
+    )
 
     @field_validator("audit_log_path", mode="before")
     @classmethod
@@ -290,6 +485,26 @@ class Settings(BaseSettings):
         if isinstance(v, Path):
             return v
         return Path(str(v))
+
+    @field_validator("config_path", mode="before")
+    @classmethod
+    def validate_clusters_config_path(cls, v: Any) -> Path | None:
+        """Normalize multi-cluster config path; empty means use default file location."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, Path):
+            return v
+        s = str(v).strip()
+        return None if not s else Path(s)
+
+    @field_validator("profile", mode="before")
+    @classmethod
+    def validate_cluster_profile(cls, v: Any) -> str | None:
+        """Treat blank profile override as unset."""
+        if v is None or v == "":
+            return None
+        s = str(v).strip()
+        return None if not s else s
 
     @field_validator(
         "mcc_url",
@@ -324,15 +539,7 @@ class Settings(BaseSettings):
         if not url:
             return None
 
-        # Validate URL format
-        if not _URL_PATTERN.match(url):
-            raise ValueError(
-                f"Invalid URL format: '{url}'. "
-                "URL must start with http:// or https:// and contain a valid hostname."
-            )
-
-        # Strip trailing slashes for consistency
-        return url.rstrip("/")
+        return validate_http_url(url)
 
     @model_validator(mode="after")
     def validate_auth_settings(self) -> Settings:
@@ -390,7 +597,9 @@ class Settings(BaseSettings):
     def validate_otel_settings(self) -> Settings:
         """Validate OpenTelemetry configuration."""
         if self.otel_enabled and self.otel_exporter_endpoint is None:
-            raise ValueError("OTEL_EXPORTER_ENDPOINT must be set when OTEL_ENABLED is true")
+            raise ValueError(
+                "MCP_OTEL_EXPORTER_ENDPOINT must be set when MCP_OTEL_ENABLED is true"
+            )
         return self
 
     @property
@@ -460,25 +669,43 @@ class Settings(BaseSettings):
         return None
 
 
-@lru_cache
+_settings: Settings | None = None
+
+
+def init_settings(settings: Settings) -> None:
+    """Install the process-wide settings singleton.
+
+    Must be called exactly once before :func:`get_settings`. Typically invoked from the
+    server entrypoint with CLI/env-merged :class:`Settings` (or ``Settings()`` for env-only).
+
+    Raises:
+        RuntimeError: If called more than once per process (tests should call
+            :func:`reset_settings_for_testing` between scenarios).
+    """
+    global _settings
+    if _settings is not None:
+        raise RuntimeError("init_settings() has already been called")
+    _settings = settings
+
+
 def get_settings() -> Settings:
-    """Get cached application settings.
+    """Return the settings installed by :func:`init_settings`.
 
-    Returns:
-        Settings instance loaded from environment.
-
-    Note:
-        This function is cached to ensure settings are loaded only once.
-        To reload settings, clear the cache with get_settings.cache_clear().
+    Raises:
+        RuntimeError: If :func:`init_settings` has not been called yet.
     """
-    return Settings()
+    if _settings is None:
+        raise RuntimeError(
+            "get_settings() called before init_settings(); "
+            "call init_settings() from the application entrypoint first"
+        )
+    return _settings
 
 
-def reload_settings() -> Settings:
-    """Reload settings by clearing the cache.
+def reset_settings_for_testing() -> None:
+    """Clear the settings singleton so another :func:`init_settings` can run.
 
-    Returns:
-        Fresh Settings instance loaded from environment.
+    Intended for the test suite only; production code should not rely on re-initialization.
     """
-    get_settings.cache_clear()
-    return get_settings()
+    global _settings
+    _settings = None

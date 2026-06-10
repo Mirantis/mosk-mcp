@@ -1,7 +1,11 @@
 """Tests for configuration management."""
 
+import os
+from unittest.mock import patch
+
 import pytest
 
+from mosk_mcp import __version__
 from mosk_mcp.core.config import (
     Environment,
     LogFormat,
@@ -9,7 +13,8 @@ from mosk_mcp.core.config import (
     Settings,
     TransportType,
     get_settings,
-    reload_settings,
+    init_settings,
+    reset_settings_for_testing,
 )
 
 
@@ -29,13 +34,28 @@ class TestSettings:
         )
 
         assert settings.app_name == "mosk-mcp"
-        assert settings.app_version == "0.1.0"
+        assert settings.app_version == __version__
         assert settings.transport == TransportType.STDIO
         assert settings.http_port == 8080
         assert settings.log_level == LogLevel.INFO
         assert settings.log_format == LogFormat.CONSOLE
         assert settings.auth_enabled is False
         assert settings.kubernetes_namespace == "default"
+
+    def test_app_metadata_not_from_env(self) -> None:
+        """``app_name`` / ``app_version`` are not loaded from ``MCP_*`` env."""
+        with patch.dict(
+            os.environ,
+            {"MCP_APP_NAME": "should-not-apply", "MCP_APP_VERSION": "99.0.0"},
+            clear=False,
+        ):
+            settings = Settings(
+                auth_enabled=False,
+                log_format=LogFormat.CONSOLE,
+                environment=Environment.DEVELOPMENT,
+            )
+        assert settings.app_name == "mosk-mcp"
+        assert settings.app_version == __version__
 
     def test_transport_enum_values(self) -> None:
         """Test transport enum values."""
@@ -59,8 +79,8 @@ class TestSettings:
         env_vars["MCP_LOG_FORMAT"] = "console"
         env_vars["MCP_ENVIRONMENT"] = "development"
 
-        # Clear cache and reload
-        settings = reload_settings()
+        init_settings(Settings())
+        settings = get_settings()
 
         assert settings.transport == TransportType.HTTP
         assert settings.http_port == 9090
@@ -277,36 +297,34 @@ class TestSSOSettings:
 
 
 class TestGetSettings:
-    """Tests for settings caching."""
+    """Tests for init_settings / get_settings."""
 
-    def test_settings_are_cached(self, env_vars: dict[str, str]) -> None:
-        """Test that get_settings returns cached instance."""
+    def test_settings_are_singleton_after_init(self, env_vars: dict[str, str]) -> None:
+        """Test that get_settings returns the same instance after init."""
         env_vars["MCP_AUTH_ENABLED"] = "false"
         env_vars["MCP_LOG_FORMAT"] = "console"
         env_vars["MCP_ENVIRONMENT"] = "development"
 
-        # Clear cache first
-        get_settings.cache_clear()
+        init_settings(Settings())
 
         settings1 = get_settings()
         settings2 = get_settings()
 
         assert settings1 is settings2
 
-    def test_reload_settings_clears_cache(self, env_vars: dict[str, str]) -> None:
-        """Test that reload_settings clears the cache."""
+    def test_reinit_reads_updated_env(self, env_vars: dict[str, str]) -> None:
+        """After reset + init, Settings() picks up updated MCP_* env."""
         env_vars["MCP_AUTH_ENABLED"] = "false"
         env_vars["MCP_LOG_FORMAT"] = "console"
         env_vars["MCP_ENVIRONMENT"] = "development"
 
-        # Clear cache first
-        get_settings.cache_clear()
-
+        init_settings(Settings())
         settings1 = get_settings()
 
         env_vars["MCP_LOG_LEVEL"] = "ERROR"
-        settings2 = reload_settings()
+        reset_settings_for_testing()
+        init_settings(Settings())
+        settings2 = get_settings()
 
-        # Should be different instances
         assert settings1 is not settings2
         assert settings2.log_level == LogLevel.ERROR
