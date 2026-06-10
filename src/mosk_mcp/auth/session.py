@@ -288,7 +288,7 @@ class UserSession:
     def __init__(
         self,
         settings: Settings,
-        mcc_url: str | None = None,
+        mgmt_url: str | None = None,
         ssl_verify: bool | None = None,
         keycloak_url: str | None = None,
         realm: str | None = None,
@@ -298,14 +298,14 @@ class UserSession:
 
         Args:
             settings: Application settings.
-            mcc_url: MCC UI URL (e.g., https://mcc.example.com). Required for auto-discovery.
+            mgmt_url: Management cluster UI URL (e.g., https://mgmt.example.com). Required for auto-discovery.
             ssl_verify: Override SSL verification setting (from cluster config).
             keycloak_url: Override Keycloak server URL (auto-discovered if None).
             realm: Override Keycloak realm name (auto-discovered if None).
             mcc_client_id: Override OIDC client ID (auto-discovered if None).
         """
         self.settings = settings
-        self._mcc_url = mcc_url or settings.mcc_url
+        self._mgmt_url = mgmt_url or settings.mgmt_url
         self._ssl_verify_override = ssl_verify
 
         # Optional overrides (normally auto-discovered)
@@ -314,12 +314,12 @@ class UserSession:
         self._mcc_client_id_override = mcc_client_id or settings.mcc_oidc_client_id
 
         # Validate required settings
-        if not self._mcc_url:
+        if not self._mgmt_url:
             raise ConfigurationError(
-                "MCC URL not configured. Set MCP_MCC_URL environment variable "
-                "(e.g., https://mcc.example.com). Keycloak and other endpoints "
-                "will be auto-discovered from MCC config.js.",
-                config_key="mcc_url",
+                "Management cluster URL not configured. Set MCP_MGMT_URL environment variable "
+                "(e.g., https://mgmt.example.com). Keycloak and other endpoints "
+                "will be auto-discovered from management cluster config.js.",
+                config_key="mgmt_url",
             )
 
         # Discovered endpoints (populated during authenticate)
@@ -368,7 +368,7 @@ class UserSession:
 
         logger.debug(
             "user_session_created",
-            mcc_url=self._mcc_url,
+            mgmt_url=self._mgmt_url,
         )
 
     def _register_cleanup(self) -> None:
@@ -1277,7 +1277,7 @@ class UserSession:
             "has_mosk_adapter": self._mosk_adapter is not None
             or (self._mosk_tokens is not None and self._mosk_oidc_info is not None),
             "has_stacklight_client": self._stacklight_client is not None,
-            "mcc_url": self._mcc_url,
+            "mgmt_url": self._mgmt_url,
             "mcc_k8s_api_url": self.mcc_k8s_api_url,
             "mosk_cluster_name": self._mosk_cluster_name,
         }

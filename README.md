@@ -384,7 +384,7 @@ Common flags and **shortcuts** (equivalent env vars in parentheses):
 
 All settings from `src/mosk_mcp/core/config.py` can be configured via environment variables using `MCP_<FIELD_NAME>` (for example, `transport` -> `MCP_TRANSPORT`).
 
-`MCP_CONFIG_PATH` and `MCP_PROFILE` are optional and mainly used for multi-cluster mode via `clusters.yaml`; single-cluster workflows can use `MCP_MCC_URL` directly.
+`MCP_CONFIG_PATH` and `MCP_PROFILE` are optional and mainly used for multi-cluster mode via `clusters.yaml`; single-cluster workflows can use `MCP_MGMT_URL` directly.
 
 #### Transport and runtime
 
@@ -414,12 +414,12 @@ All settings from `src/mosk_mcp/core/config.py` can be configured via environmen
 | `MCP_AUDIT_BACKUP_COUNT` | `10` | Number of rotated audit files to keep |
 | `MCP_AUDIT_ROTATION_WHEN` | `midnight` | Rotation schedule keyword (for example `midnight`, `h`, `d`) |
 
-#### Authentication, MCC, and service endpoint discovery
+#### Authentication, management cluster, and service endpoint discovery
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MCP_AUTH_ENABLED` | `true` | Enable OAuth 2.0 Device Flow authentication |
-| `MCP_MCC_URL` | *(unset)* | MCC base URL; required in production unless resolved via cluster profile config |
+| `MCP_MGMT_URL` | *(unset)* | Management cluster base URL; required in production unless resolved via cluster profile config |
 | `MCP_KEYCLOAK_URL` | *(unset)* | Optional Keycloak base URL override |
 | `MCP_KEYCLOAK_REALM` | *(unset)* | Optional Keycloak realm override |
 | `MCP_MCC_OIDC_CLIENT_ID` | *(unset)* | Optional OIDC client id override |
@@ -507,7 +507,7 @@ The MOSK MCP Server uses OAuth 2.0 Device Authorization Flow for secure browser-
 **Step 1: Access Keycloak Admin Console**
 
 ```
-https://<mcc-url>/auth/admin/
+https://<mgmt-url>/auth/admin/
 ```
 
 Login with Keycloak admin credentials.
@@ -533,7 +533,7 @@ Login with Keycloak admin credentials.
 
 Test the device authorization endpoint:
 ```bash
-curl -k https://<mcc-url>/auth/realms/iam/protocol/openid-connect/auth/device
+curl -k https://<mgmt-url>/auth/realms/iam/protocol/openid-connect/auth/device
 ```
 
 A successful response returns JSON (not a 404 error).
@@ -663,7 +663,7 @@ Claude Desktop manages the container lifecycle automatically. Configure via `cla
 ./scripts/docker-build.sh --local
 
 # Start in HTTP mode for testing
-./scripts/docker-run.sh start --mcc-url https://mcc.example.com
+./scripts/docker-run.sh start --mgmt-url https://mgmt.example.com
 
 # Status, logs, stop
 ./scripts/docker-run.sh status
@@ -724,7 +724,7 @@ mypy src
 
 **Connection refused:**
 ```bash
-curl -k https://your-mcc-url/config.js
+curl -k https://your-mgmt-url/config.js
 ```
 
 **SSL certificate errors:**

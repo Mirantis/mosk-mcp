@@ -37,11 +37,11 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-async def _get_mcc_url_from_cluster(settings: Settings) -> tuple[str | None, bool]:
-    """Get MCC URL from active cluster config, falling back to settings.
+async def _get_mgmt_url_from_cluster(settings: Settings) -> tuple[str | None, bool]:
+    """Get management cluster URL from active cluster config, falling back to settings.
 
     Returns:
-        Tuple of (mcc_url, ssl_verify)
+        Tuple of (mgmt_url, ssl_verify)
     """
     # First try to get URL from active cluster
     try:
@@ -72,10 +72,10 @@ async def _get_mcc_url_from_cluster(settings: Settings) -> tuple[str | None, boo
     # Fall back to settings
     logger.info(
         "falling_back_to_settings",
-        mcc_url=settings.mcc_url,
+        mgmt_url=settings.mgmt_url,
         ssl_verify=settings.ssl_verify,
     )
-    return settings.mcc_url, settings.ssl_verify
+    return settings.mgmt_url, settings.ssl_verify
 
 
 def register_auth_tools(
@@ -152,8 +152,8 @@ def register_auth_tools(
                     DeviceFlowLoginManager,
                 )
 
-                # Get MCC URL from active cluster config (or fall back to settings)
-                mcc_url, ssl_verify = await _get_mcc_url_from_cluster(settings)
+                # Get management cluster URL from active cluster config (or fall back to settings)
+                mgmt_url, ssl_verify = await _get_mgmt_url_from_cluster(settings)
 
                 context = context_getter()
                 if not context:
@@ -162,7 +162,7 @@ def register_auth_tools(
                 if context._session is None:
                     context._session = UserSession(
                         settings=settings,
-                        mcc_url=mcc_url,  # Pass URL from cluster config
+                        mgmt_url=mgmt_url,  # Pass URL from cluster config
                         ssl_verify=ssl_verify,  # Pass SSL verify from cluster config
                         keycloak_url=settings.keycloak_url,
                         realm=settings.keycloak_realm,
@@ -172,7 +172,7 @@ def register_auth_tools(
                 manager = DeviceFlowLoginManager(
                     settings,
                     context._session,
-                    mcc_url_override=mcc_url,
+                    mgmt_url_override=mgmt_url,
                     ssl_verify_override=ssl_verify,
                 )
                 context._device_flow_manager = manager
@@ -294,8 +294,8 @@ def register_auth_tools(
                     DeviceFlowLoginManager,
                 )
 
-                # Get MCC URL from active cluster config (or fall back to settings)
-                mcc_url, ssl_verify = await _get_mcc_url_from_cluster(settings)
+                # Get management cluster URL from active cluster config (or fall back to settings)
+                mgmt_url, ssl_verify = await _get_mgmt_url_from_cluster(settings)
 
                 context = context_getter()
                 if not context:
@@ -304,7 +304,7 @@ def register_auth_tools(
                 if context._session is None:
                     context._session = UserSession(
                         settings=settings,
-                        mcc_url=mcc_url,  # Pass URL from cluster config
+                        mgmt_url=mgmt_url,  # Pass URL from cluster config
                         ssl_verify=ssl_verify,  # Pass SSL verify from cluster config
                         keycloak_url=settings.keycloak_url,
                         realm=settings.keycloak_realm,
@@ -314,7 +314,7 @@ def register_auth_tools(
                 manager = DeviceFlowLoginManager(
                     settings,
                     context._session,
-                    mcc_url_override=mcc_url,
+                    mgmt_url_override=mgmt_url,
                     ssl_verify_override=ssl_verify,
                 )
                 context._device_flow_manager = manager

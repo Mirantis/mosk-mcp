@@ -120,7 +120,7 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
         version=settings.app_version,
         transport=settings.transport.value,
         environment=settings.environment.value,
-        mcc_url=settings.mcc_url,
+        mgmt_url=settings.mgmt_url,
     )
 
     # Create server context configuration from settings
@@ -158,7 +158,7 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
 
         logger.info(
             "sso_server_context_ready",
-            mcc_url=settings.mcc_url,
+            mgmt_url=settings.mgmt_url,
             keycloak_url=settings.keycloak_url,
             health_monitoring=context_config.enable_health_monitoring,
             cache_enabled=context_config.enable_cache_cleanup,

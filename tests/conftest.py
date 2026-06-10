@@ -172,7 +172,7 @@ def env_vars() -> Generator[dict[str, str], None, None]:
 def default_settings() -> Settings:
     """Create default settings for testing.
 
-    Uses development mode which doesn't require MCC URL.
+    Uses development mode which doesn't require management cluster URL.
     """
     return Settings(
         transport=TransportType.STDIO,
@@ -216,7 +216,7 @@ def http_settings() -> Settings:
 def production_settings() -> Settings:
     """Create production-like settings.
 
-    Production mode requires MCC URL.
+    Production mode requires management cluster URL.
     """
     return Settings(
         transport=TransportType.STDIO,
@@ -225,7 +225,7 @@ def production_settings() -> Settings:
         environment=Environment.PRODUCTION,
         auth_enabled=True,
         otel_enabled=False,
-        mcc_url="https://172.16.166.22",
+        mgmt_url="https://172.16.166.22",
     )
 
 

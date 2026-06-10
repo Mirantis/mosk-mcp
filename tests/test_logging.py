@@ -36,7 +36,7 @@ class TestSetupLogging:
             environment=Environment.PRODUCTION,
             auth_enabled=True,
             auth_api_key="xK9mN2pL7qR4sT6uV8wY0zA3bC5dE7fG",  # type: ignore[arg-type]
-            mcc_url="https://172.16.166.22",
+            mgmt_url="https://172.16.166.22",
         )
 
         setup_logging(settings)
@@ -196,7 +196,7 @@ class TestLogOutput:
             environment=Environment.PRODUCTION,
             auth_enabled=True,
             auth_api_key="xK9mN2pL7qR4sT6uV8wY0zA3bC5dE7fG",  # type: ignore[arg-type]
-            mcc_url="https://172.16.166.22",
+            mgmt_url="https://172.16.166.22",
         )
         setup_logging(settings)
 
@@ -232,7 +232,7 @@ class TestLogOutput:
             environment=Environment.PRODUCTION,
             auth_enabled=True,
             auth_api_key="xK9mN2pL7qR4sT6uV8wY0zA3bC5dE7fG",  # type: ignore[arg-type]
-            mcc_url="https://172.16.166.22",
+            mgmt_url="https://172.16.166.22",
         )
         setup_logging(settings)
 

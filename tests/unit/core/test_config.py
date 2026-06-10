@@ -27,85 +27,85 @@ class TestURLValidation:
 
     def test_valid_https_url(self) -> None:
         """Test valid HTTPS URL is accepted."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "https://example.com"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "https://example.com"}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "https://example.com"
+            assert settings.mgmt_url == "https://example.com"
 
     def test_valid_http_url(self) -> None:
         """Test valid HTTP URL is accepted."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "http://example.com"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "http://example.com"}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "http://example.com"
+            assert settings.mgmt_url == "http://example.com"
 
     def test_url_with_port(self) -> None:
         """Test URL with port is accepted."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "https://example.com:8443"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "https://example.com:8443"}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "https://example.com:8443"
+            assert settings.mgmt_url == "https://example.com:8443"
 
     def test_url_with_ip_address(self) -> None:
         """Test URL with IP address is accepted."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "https://192.168.1.100"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "https://192.168.1.100"}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "https://192.168.1.100"
+            assert settings.mgmt_url == "https://192.168.1.100"
 
     def test_url_with_ip_and_port(self) -> None:
         """Test URL with IP address and port is accepted."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "https://172.16.166.22:443"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "https://172.16.166.22:443"}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "https://172.16.166.22:443"
+            assert settings.mgmt_url == "https://172.16.166.22:443"
 
     def test_url_with_path(self) -> None:
         """Test URL with path is accepted."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "https://example.com/api/v1"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "https://example.com/api/v1"}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "https://example.com/api/v1"
+            assert settings.mgmt_url == "https://example.com/api/v1"
 
     def test_url_trailing_slash_stripped(self) -> None:
         """Test trailing slashes are stripped for consistency."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "https://example.com/"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "https://example.com/"}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "https://example.com"
+            assert settings.mgmt_url == "https://example.com"
 
     def test_url_multiple_trailing_slashes_stripped(self) -> None:
         """Test multiple trailing slashes are stripped."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "https://example.com///"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "https://example.com///"}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "https://example.com"
+            assert settings.mgmt_url == "https://example.com"
 
     def test_url_whitespace_stripped(self) -> None:
         """Test whitespace around URL is stripped."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "  https://example.com  "}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "  https://example.com  "}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "https://example.com"
+            assert settings.mgmt_url == "https://example.com"
 
     def test_empty_url_becomes_none(self) -> None:
         """Test empty string becomes None."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": ""}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": ""}, clear=False):
             settings = Settings()
-            assert settings.mcc_url is None
+            assert settings.mgmt_url is None
 
     def test_whitespace_only_url_becomes_none(self) -> None:
         """Test whitespace-only string becomes None."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "   "}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "   "}, clear=False):
             settings = Settings()
-            assert settings.mcc_url is None
+            assert settings.mgmt_url is None
 
     def test_invalid_url_no_scheme(self) -> None:
         """Test URL without scheme is rejected."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "example.com"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "example.com"}, clear=False):
             with pytest.raises(ValueError, match="Invalid URL format"):
                 Settings()
 
     def test_invalid_url_wrong_scheme(self) -> None:
         """Test URL with non-http scheme is rejected."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "ftp://example.com"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "ftp://example.com"}, clear=False):
             with pytest.raises(ValueError, match="Invalid URL format"):
                 Settings()
 
     def test_invalid_url_no_hostname(self) -> None:
         """Test URL without hostname is rejected."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "https://"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "https://"}, clear=False):
             with pytest.raises(ValueError, match="Invalid URL format"):
                 Settings()
 
@@ -153,15 +153,15 @@ class TestURLValidation:
 
     def test_ipv6_url(self) -> None:
         """Test IPv6 URL in brackets is accepted."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "https://[::1]:8443"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "https://[::1]:8443"}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "https://[::1]:8443"
+            assert settings.mgmt_url == "https://[::1]:8443"
 
     def test_ipv6_url_full(self) -> None:
         """Test full IPv6 URL is accepted."""
-        with patch.dict(os.environ, {"MCP_MCC_URL": "https://[2001:db8::1]:443"}, clear=False):
+        with patch.dict(os.environ, {"MCP_MGMT_URL": "https://[2001:db8::1]:443"}, clear=False):
             settings = Settings()
-            assert settings.mcc_url == "https://[2001:db8::1]:443"
+            assert settings.mgmt_url == "https://[2001:db8::1]:443"
 
 
 class TestEnvironmentValidation:
@@ -174,14 +174,14 @@ class TestEnvironmentValidation:
             {
                 "MCP_ENVIRONMENT": "production",
                 "MCP_AUTH_ENABLED": "false",
-                "MCP_MCC_URL": "https://example.com",
+                "MCP_MGMT_URL": "https://example.com",
             },
             clear=False,
         ), pytest.raises(ValueError, match="Authentication cannot be disabled in production"):
             Settings()
 
-    def test_production_requires_mcc_url(self) -> None:
-        """Test production mode requires MCC URL."""
+    def test_production_requires_mgmt_url(self) -> None:
+        """Test production mode requires management cluster URL."""
         with patch.dict(
             os.environ,
             {
@@ -190,11 +190,11 @@ class TestEnvironmentValidation:
             },
             clear=False,
         ):
-            # Clear MCC_URL if it was set
+            # Clear MCP_MGMT_URL if it was set
             env = os.environ.copy()
-            env.pop("MCP_MCC_URL", None)
+            env.pop("MCP_MGMT_URL", None)
             with patch.dict(os.environ, env, clear=True):
-                with pytest.raises(ValueError, match="MCC URL is required in production"):
+                with pytest.raises(ValueError, match="Management cluster URL is required in production"):
                     Settings()
 
     def test_development_allows_no_auth(self) -> None:
@@ -217,7 +217,7 @@ class TestEnvironmentValidation:
             {
                 "MCP_ENVIRONMENT": "production",
                 "MCP_AUTH_ENABLED": "true",
-                "MCP_MCC_URL": "https://example.com",
+                "MCP_MGMT_URL": "https://example.com",
             },
             clear=False,
         ):
