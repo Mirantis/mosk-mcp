@@ -117,6 +117,12 @@ class TestURLValidation:
             settings = Settings()
             assert settings.keycloak_url == "https://keycloak.example.com"
 
+    def test_oidc_client_id_from_env(self) -> None:
+        """Test OIDC client id is loaded from MCP_OIDC_CLIENT_ID."""
+        with patch.dict(os.environ, {"MCP_OIDC_CLIENT_ID": "kaas"}, clear=False):
+            settings = Settings()
+            assert settings.oidc_client_id == "kaas"
+
     def test_prometheus_url_validation(self) -> None:
         """Test Prometheus URL is validated."""
         with patch.dict(

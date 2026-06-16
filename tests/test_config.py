@@ -260,7 +260,7 @@ class TestSSOSettings:
         # All other settings should be None (will be auto-discovered)
         assert settings.keycloak_url is None
         assert settings.keycloak_realm is None
-        assert settings.mcc_oidc_client_id is None
+        assert settings.oidc_client_id is None
         assert settings.prometheus_url is None
         assert settings.alertmanager_url is None
 
@@ -271,7 +271,7 @@ class TestSSOSettings:
             # Optional overrides (normally auto-discovered)
             keycloak_url="https://keycloak.example.com",
             keycloak_realm="iam",
-            mcc_oidc_client_id="kaas",
+            oidc_client_id="kaas",
             prometheus_url="https://prometheus.example.com",
             alertmanager_url="https://alertmanager.example.com",
             auth_enabled=False,
@@ -281,7 +281,7 @@ class TestSSOSettings:
         assert settings.mgmt_url == "https://172.16.166.22"
         assert settings.keycloak_url == "https://keycloak.example.com"
         assert settings.keycloak_realm == "iam"
-        assert settings.mcc_oidc_client_id == "kaas"
+        assert settings.oidc_client_id == "kaas"
         assert settings.prometheus_url == "https://prometheus.example.com"
         assert settings.alertmanager_url == "https://alertmanager.example.com"
 

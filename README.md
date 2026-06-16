@@ -417,7 +417,7 @@ All settings from `src/mosk_mcp/core/config.py` can be configured via environmen
 | `MCP_MGMT_URL` | *(unset)* | Management cluster base URL; required in production unless resolved via cluster profile config |
 | `MCP_KEYCLOAK_URL` | *(unset)* | Optional Keycloak base URL override |
 | `MCP_KEYCLOAK_REALM` | *(unset)* | Optional Keycloak realm override |
-| `MCP_MCC_OIDC_CLIENT_ID` | *(unset)* | Optional OIDC client id override |
+| `MCP_OIDC_CLIENT_ID` | *(unset)* | Optional OIDC client id override (`MCP_MCC_OIDC_CLIENT_ID` deprecated alias) |
 | `MCP_PROMETHEUS_URL` | *(unset)* | Optional Prometheus IAM proxy URL override |
 | `MCP_ALERTMANAGER_URL` | *(unset)* | Optional Alertmanager IAM proxy URL override |
 | `MCP_OPENSEARCH_URL` | *(unset)* | Optional OpenSearch/Kibana IAM proxy URL override |

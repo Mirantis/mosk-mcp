@@ -166,7 +166,7 @@ def register_auth_tools(
                         ssl_verify=ssl_verify,  # Pass SSL verify from cluster config
                         keycloak_url=settings.keycloak_url,
                         realm=settings.keycloak_realm,
-                        mcc_client_id=settings.mcc_oidc_client_id,
+                        oidc_client_id=settings.oidc_client_id,
                     )
 
                 manager = DeviceFlowLoginManager(
@@ -308,7 +308,7 @@ def register_auth_tools(
                         ssl_verify=ssl_verify,  # Pass SSL verify from cluster config
                         keycloak_url=settings.keycloak_url,
                         realm=settings.keycloak_realm,
-                        mcc_client_id=settings.mcc_oidc_client_id,
+                        oidc_client_id=settings.oidc_client_id,
                     )
 
                 manager = DeviceFlowLoginManager(

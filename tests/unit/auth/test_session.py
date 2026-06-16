@@ -183,7 +183,7 @@ class TestUserSessionInitialization:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
         settings.ssl_verify = True
         settings.prometheus_url = None
         settings.alertmanager_url = None
@@ -196,7 +196,7 @@ class TestUserSessionInitialization:
         settings.mgmt_url = None
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         with pytest.raises(ConfigurationError, match="Management cluster URL not configured"):
             UserSession(settings)
@@ -245,7 +245,7 @@ class TestUserSessionAuthentication:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
         settings.ssl_verify = True
 
         session = UserSession(settings)
@@ -273,7 +273,7 @@ class TestUserSessionAuthentication:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         with pytest.raises(AuthenticationError, match="Session not authenticated"):
@@ -301,7 +301,7 @@ class TestUserSessionTempFileCleanup:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
         settings.ssl_verify = True
 
         session = UserSession(settings)
@@ -338,7 +338,7 @@ class TestUserSessionTempFileCleanup:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         session._mcc_kubeconfig_path = Path("/nonexistent/path.yaml")
@@ -354,7 +354,7 @@ class TestUserSessionTempFileCleanup:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         session._mcc_kubeconfig_path = None
@@ -374,7 +374,7 @@ class TestUserSessionLogout:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
         settings.ssl_verify = True
 
         session = UserSession(settings)
@@ -463,7 +463,7 @@ class TestUserSessionRefreshTokens:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
         settings.ssl_verify = True
 
         session = UserSession(settings)
@@ -509,7 +509,7 @@ class TestAtexitCleanup:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
 
@@ -533,7 +533,7 @@ class TestAtexitCleanup:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         ref = weakref.ref(session)
@@ -554,7 +554,7 @@ class TestGetStatus:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         status = session.get_status()
@@ -572,7 +572,7 @@ class TestGetStatus:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         session.state.authenticated = True
@@ -601,7 +601,7 @@ class TestContextManager:
         settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         async with UserSession(settings) as session:
             session.state.authenticated = True

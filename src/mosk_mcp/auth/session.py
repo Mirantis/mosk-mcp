@@ -292,7 +292,7 @@ class UserSession:
         ssl_verify: bool | None = None,
         keycloak_url: str | None = None,
         realm: str | None = None,
-        mcc_client_id: str | None = None,
+        oidc_client_id: str | None = None,
     ) -> None:
         """Initialize user session.
 
@@ -302,7 +302,7 @@ class UserSession:
             ssl_verify: Override SSL verification setting (from cluster config).
             keycloak_url: Override Keycloak server URL (auto-discovered if None).
             realm: Override Keycloak realm name (auto-discovered if None).
-            mcc_client_id: Override OIDC client ID (auto-discovered if None).
+            oidc_client_id: Override OIDC client ID (auto-discovered if None).
         """
         self.settings = settings
         self._mgmt_url = mgmt_url or settings.mgmt_url
@@ -311,7 +311,7 @@ class UserSession:
         # Optional overrides (normally auto-discovered)
         self._keycloak_url_override = keycloak_url or settings.keycloak_url
         self._realm_override = realm or settings.keycloak_realm
-        self._mcc_client_id_override = mcc_client_id or settings.mcc_oidc_client_id
+        self._oidc_client_id_override = oidc_client_id or settings.oidc_client_id
 
         # Validate required settings
         if not self._mgmt_url:

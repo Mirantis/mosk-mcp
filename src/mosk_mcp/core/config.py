@@ -375,9 +375,9 @@ class Settings(BaseSettings):
         default=None,
         description='Override Keycloak realm (default from MCC is often ``"iam"``).',
     )
-    mcc_oidc_client_id: str | None = Field(
+    oidc_client_id: str | None = Field(
         default=None,
-        description='Override OIDC client id (MCC default is often ``"kaas"``).',
+        description='Override OIDC client id (management cluster default is often ``"kaas"``).',
     )
     prometheus_url: str | None = Field(
         default=None,
