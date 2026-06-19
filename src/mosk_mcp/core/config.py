@@ -78,9 +78,9 @@ class Settings(BaseSettings):
     **Prefix:** Environment variables use ``MCP_<FIELD_NAME>`` (see ``model_config``).
     **Dotenv:** ``DOTENV_PATH`` (not ``MCP_``-prefixed) selects the env file (default: ``.env``).
 
-    **Authentication:** SSO via Keycloak OIDC (OAuth 2.0 Device Flow). Set ``MCP_MCC_URL``
+    **Authentication:** SSO via Keycloak OIDC (OAuth 2.0 Device Flow). Set ``MCP_MGMT_URL``
     when not using multi-cluster ``clusters.yaml``; other endpoints are auto-discovered from
-    MCC ``config.js``.
+    management cluster ``config.js``.
     """
     # **CLI:** The ``mosk-mcp`` console script uses ``CliApp`` (see ``mosk_mcp.cli``): kebab-case
     # flags, ``cli_shortcuts`` for names like ``--host`` / ``--port``, and ``CliToggleFlag`` on
@@ -358,13 +358,13 @@ class Settings(BaseSettings):
         ),
     ] = 30
 
-    # --- MCC / SSO endpoints ---
-    mcc_url: str | None = Field(
+    # --- Management cluster / SSO endpoints ---
+    mgmt_url: str | None = Field(
         default=None,
         description=(
-            "MCC UI base URL (e.g. ``https://mcc.example.com``). Required in production when "
-            "not relying solely on multi-cluster config. Keycloak and other URLs are read from "
-            "MCC ``config.js`` when unset."
+            "MOSK management cluster UI base URL (e.g. ``https://mgmt.example.com``). Required in "
+            "production when not relying solely on multi-cluster config. Keycloak and other URLs "
+            "are read from management cluster ``config.js`` when unset."
         ),
     )
     keycloak_url: str | None = Field(
@@ -375,9 +375,9 @@ class Settings(BaseSettings):
         default=None,
         description='Override Keycloak realm (default from MCC is often ``"iam"``).',
     )
-    mcc_oidc_client_id: str | None = Field(
+    oidc_client_id: str | None = Field(
         default=None,
-        description='Override OIDC client id (MCC default is often ``"kaas"``).',
+        description='Override OIDC client id (management cluster default is often ``"kaas"``).',
     )
     prometheus_url: str | None = Field(
         default=None,
@@ -507,7 +507,7 @@ class Settings(BaseSettings):
         return None if not s else s
 
     @field_validator(
-        "mcc_url",
+        "mgmt_url",
         "keycloak_url",
         "prometheus_url",
         "alertmanager_url",
@@ -564,19 +564,20 @@ class Settings(BaseSettings):
     def validate_sso_settings(self) -> Settings:
         """Validate SSO configuration.
 
-        SSO authentication requires MCC URL to be set in production mode.
-        In development mode, MCC URL is optional to allow testing without
-        a real MCC cluster.
+        SSO authentication requires management cluster URL to be set in production mode.
+        In development mode, management cluster URL is optional to allow testing without
+        a real management cluster.
 
         Raises:
-            ValueError: If MCC URL is not configured in production mode.
+            ValueError: If management cluster URL is not configured in production mode.
         """
-        # In production, MCC URL is always required
-        if self.is_production and not self.mcc_url:
+        # In production, management cluster URL is always required
+        if self.is_production and not self.mgmt_url:
             raise ValueError(
-                "MCC URL is required in production. Set MCP_MCC_URL environment variable "
-                "(e.g., https://mcc.example.com). "
-                "Keycloak and other endpoints will be auto-discovered from MCC config.js."
+                "Management cluster URL is required in production. Set MCP_MGMT_URL environment "
+                "variable (e.g., https://mgmt.example.com). "
+                "Keycloak and other endpoints will be auto-discovered from management cluster "
+                "config.js."
             )
         return self
 

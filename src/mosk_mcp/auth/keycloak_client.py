@@ -345,7 +345,7 @@ async def discover_mcc_endpoints(
         mcc_ui_url = f"https://{mcc_ui_url}"
     mcc_ui_url = mcc_ui_url.rstrip("/")
 
-    logger.info("discovering_mcc_endpoints", mcc_url=mcc_ui_url)
+    logger.info("discovering_mcc_endpoints", mgmt_url=mcc_ui_url)
 
     try:
         async with httpx.AsyncClient(

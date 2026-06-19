@@ -180,37 +180,37 @@ class TestUserSessionInitialization:
     def mock_settings(self) -> MagicMock:
         """Create mock settings."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
         settings.ssl_verify = True
         settings.prometheus_url = None
         settings.alertmanager_url = None
         settings.opensearch_url = None
         return settings
 
-    def test_init_no_mcc_url_raises(self) -> None:
-        """Raises ConfigurationError when MCC URL is not set."""
+    def test_init_no_mgmt_url_raises(self) -> None:
+        """Raises ConfigurationError when management cluster URL is not set."""
         settings = MagicMock()
-        settings.mcc_url = None
+        settings.mgmt_url = None
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
-        with pytest.raises(ConfigurationError, match="MCC URL not configured"):
+        with pytest.raises(ConfigurationError, match="Management cluster URL not configured"):
             UserSession(settings)
 
-    def test_init_with_mcc_url_succeeds(self, mock_settings: MagicMock) -> None:
-        """Session initializes with valid MCC URL."""
+    def test_init_with_mgmt_url_succeeds(self, mock_settings: MagicMock) -> None:
+        """Session initializes with valid management cluster URL."""
         session = UserSession(mock_settings)
-        assert session._mcc_url == "https://mcc.example.com"
+        assert session._mgmt_url == "https://mcc.example.com"
         assert session.state.authenticated is False
 
     def test_init_with_url_override(self, mock_settings: MagicMock) -> None:
         """Session uses explicit URL override over settings."""
-        session = UserSession(mock_settings, mcc_url="https://override.example.com")
-        assert session._mcc_url == "https://override.example.com"
+        session = UserSession(mock_settings, mgmt_url="https://override.example.com")
+        assert session._mgmt_url == "https://override.example.com"
 
     def test_init_registers_cleanup(self, mock_settings: MagicMock) -> None:
         """Session registers atexit cleanup handler using weakref only.
@@ -242,10 +242,10 @@ class TestUserSessionAuthentication:
     def authenticated_session(self) -> UserSession:
         """Create an authenticated session."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
         settings.ssl_verify = True
 
         session = UserSession(settings)
@@ -270,10 +270,10 @@ class TestUserSessionAuthentication:
     def test_ensure_authenticated_raises_when_not_authenticated(self) -> None:
         """Raises AuthenticationError when not authenticated."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         with pytest.raises(AuthenticationError, match="Session not authenticated"):
@@ -298,10 +298,10 @@ class TestUserSessionTempFileCleanup:
     def session_with_temp_files(self, tmp_path: Path) -> UserSession:
         """Create session with temp kubeconfig files."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
         settings.ssl_verify = True
 
         session = UserSession(settings)
@@ -335,10 +335,10 @@ class TestUserSessionTempFileCleanup:
     def test_cleanup_temp_files_handles_nonexistent_files(self) -> None:
         """_cleanup_temp_files handles files that don't exist (no-op)."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         session._mcc_kubeconfig_path = Path("/nonexistent/path.yaml")
@@ -351,10 +351,10 @@ class TestUserSessionTempFileCleanup:
     def test_cleanup_temp_files_handles_none_paths(self) -> None:
         """_cleanup_temp_files handles None paths."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         session._mcc_kubeconfig_path = None
@@ -371,10 +371,10 @@ class TestUserSessionLogout:
     def session_with_resources(self) -> UserSession:
         """Create session with adapters and client."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
         settings.ssl_verify = True
 
         session = UserSession(settings)
@@ -460,10 +460,10 @@ class TestUserSessionRefreshTokens:
     def session_for_refresh(self) -> UserSession:
         """Create session ready for token refresh tests."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
         settings.ssl_verify = True
 
         session = UserSession(settings)
@@ -506,10 +506,10 @@ class TestAtexitCleanup:
         import weakref
 
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
 
@@ -530,10 +530,10 @@ class TestAtexitCleanup:
         import weakref
 
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         ref = weakref.ref(session)
@@ -551,10 +551,10 @@ class TestGetStatus:
     def test_get_status_unauthenticated(self) -> None:
         """get_status returns correct info for unauthenticated session."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         status = session.get_status()
@@ -564,15 +564,15 @@ class TestGetStatus:
         assert status["token_expired"] is True
         assert status["has_mcc_adapter"] is False
         assert status["has_mosk_adapter"] is False
-        assert status["mcc_url"] == "https://mcc.example.com"
+        assert status["mgmt_url"] == "https://mcc.example.com"
 
     def test_get_status_authenticated(self) -> None:
         """get_status returns correct info for authenticated session."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         session = UserSession(settings)
         session.state.authenticated = True
@@ -598,10 +598,10 @@ class TestContextManager:
     async def test_context_manager_calls_logout(self) -> None:
         """Context manager calls logout on exit."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.keycloak_url = None
         settings.keycloak_realm = None
-        settings.mcc_oidc_client_id = None
+        settings.oidc_client_id = None
 
         async with UserSession(settings) as session:
             session.state.authenticated = True

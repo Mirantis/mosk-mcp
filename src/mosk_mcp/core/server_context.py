@@ -451,7 +451,7 @@ class SSOServerContext:
                 settings=self.settings,
                 keycloak_url=self.settings.keycloak_url,
                 realm=self.settings.keycloak_realm,
-                mcc_client_id=self.settings.mcc_oidc_client_id,
+                oidc_client_id=self.settings.oidc_client_id,
             )
 
         # Create device flow manager
