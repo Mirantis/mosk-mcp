@@ -23,6 +23,11 @@ if ! command -v npx &>/dev/null; then
     exit 1
 fi
 
+if [ -z "${MOSK_LAB_JUMP_SSH:-}" ]; then
+    echo "Error: MOSK_LAB_JUMP_SSH is not set. Configure it in .env."
+    exit 1
+fi
+
 cleanup_jobs() {
     trap - EXIT TERM
     [ -n "${SSH_PROXY_PID}" ] && kill "${SSH_PROXY_PID}" 2>/dev/null || true
@@ -33,8 +38,23 @@ cleanup_jobs() {
 trap cleanup_jobs EXIT TERM
 
 echo "Starting SSH Dynamic SOCKS Proxy..."
-ssh $MOSK_LAB_JUMP_SSH -N -D :$SOCKS_PROXY_PORT &
-SSH_PROXY_PID=$!
+if ! ssh \
+    -f \
+    -o BatchMode=yes \
+    -o ConnectTimeout=10 \
+    -o ExitOnForwardFailure=yes \
+    -N -D ":${SOCKS_PROXY_PORT}" \
+    $MOSK_LAB_JUMP_SSH; then
+    echo "Error: SSH SOCKS proxy failed to start." >&2
+    echo "Check MOSK_LAB_JUMP_SSH and that a usable SSH key is loaded (e.g. ssh-add -l)." >&2
+    exit 1
+fi
+
+SSH_PROXY_PID=$(lsof -ti "tcp:${SOCKS_PROXY_PORT}" -sTCP:LISTEN 2>/dev/null | head -1)
+if [ -z "${SSH_PROXY_PID}" ]; then
+    echo "Error: SSH SOCKS proxy did not bind to port ${SOCKS_PROXY_PORT}." >&2
+    exit 1
+fi
 
 npx @modelcontextprotocol/inspector --server-url $MCP_URL &
 INSPECTOR_PID=$!
