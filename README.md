@@ -395,6 +395,39 @@ All settings from `src/mosk_mcp/core/config.py` can be configured via environmen
 | `MCP_HTTP_PORT` | `8080` | TCP port for MCP HTTP server when using HTTP transports |
 | `MCP_ENVIRONMENT` | `development` | Process mode: `development`, `staging`, or `production` |
 
+#### Tool groups
+
+`MCP_TOOLS` controls which **optional** tool groups are registered by the MCP server. Auth tools, cluster management tools, and core utilities (`health_check`, `server_info`, `echo`) are always registered and are not part of this setting.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TOOLS` | *(unset)* | Comma-separated list of optional tool groups to enable. Unset or empty enables all optional groups. |
+
+**Valid group ids:**
+
+| Group id | Tools |
+|----------|-------|
+| `templates` | Template generation (BMH, Machine, OSDPL patch, etc.) |
+| `ceph` | Ceph storage operations |
+| `rabbitmq` | RabbitMQ messaging operations |
+| `nodes` | Node / machine lifecycle |
+| `visibility` | Operations visibility (deployments, upgrades, rollouts) |
+| `health` | Cluster health monitoring |
+| `troubleshooting` | Diagnostics and log analysis |
+| `validation` | Post-upgrade validation |
+
+**Examples:**
+
+```bash
+# Enable only template generation and Ceph tools
+MCP_TOOLS=templates,ceph mosk-mcp
+
+# Enable troubleshooting and validation only
+MCP_TOOLS=troubleshooting,validation mosk-mcp
+```
+
+Invalid group names cause startup to fail with a validation error listing valid ids. At startup the server logs enabled and disabled groups (`tool_groups_configured` at INFO level). The `server_info` tool reports enabled optional groups in its `capabilities` field.
+
 #### Logging and audit
 
 | Variable | Default | Description |
