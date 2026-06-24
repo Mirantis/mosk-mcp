@@ -4,7 +4,8 @@ import pytest
 from fastmcp.client import Client
 
 from mosk_mcp import __version__
-from mosk_mcp.core.config import Settings
+from mosk_mcp.core.config import Environment, LogFormat, LogLevel, Settings, TransportType
+from mosk_mcp.core.config import init_settings, reset_settings_for_testing
 from mosk_mcp.core.exceptions import (
     AuthenticationError,
     AuthorizationError,
@@ -118,12 +119,14 @@ class TestServerInfoTool:
         data = result.data
 
         expected_capabilities = [
-            "template_generation",
-            "node_lifecycle",
-            "ceph_operations",
+            "templates",
+            "nodes",
+            "ceph",
             "visibility",
             "health",
             "troubleshooting",
+            "rabbitmq",
+            "validation",
         ]
         capabilities = data.capabilities
         for cap in expected_capabilities:
@@ -254,6 +257,65 @@ class TestServerModels:
 
         assert info.name == "mosk-mcp"
         assert "template_generation" in info.capabilities
+
+
+class TestMcpToolsConfiguration:
+    """Tests for selective tool group registration via MCP_TOOLS."""
+
+    @pytest.fixture
+    def templates_only_settings(self) -> Settings:
+        return Settings(
+            transport=TransportType.STDIO,
+            log_level=LogLevel.DEBUG,
+            log_format=LogFormat.CONSOLE,
+            environment=Environment.DEVELOPMENT,
+            auth_enabled=False,
+            otel_enabled=False,
+            tools="templates",
+        )
+
+    @pytest.fixture
+    async def templates_only_client(self, templates_only_settings: Settings):
+        from fastmcp.client import Client
+
+        reset_settings_for_testing()
+        init_settings(templates_only_settings)
+        server = create_mcp_server(templates_only_settings)
+        async with Client(transport=server) as client:
+            yield client
+
+    @pytest.mark.asyncio
+    async def test_partial_tools_registers_subset(self, templates_only_client: Client) -> None:
+        tools = await templates_only_client.list_tools()
+        tool_names = {t.name for t in tools}
+
+        assert "generate_bmhi" in tool_names
+        assert "get_ceph_status" not in tool_names
+        assert "list_clusters" in tool_names
+        assert "login_start" in tool_names
+
+    @pytest.mark.asyncio
+    async def test_partial_tools_server_info_capabilities(
+        self, templates_only_client: Client
+    ) -> None:
+        result = await templates_only_client.call_tool("server_info", {})
+        assert result.data is not None
+        assert result.data.capabilities == ["templates"]
+
+    def test_startup_logs_enabled_and_disabled_groups(
+        self, templates_only_settings: Settings, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from mosk_mcp.observability.logging import setup_logging
+
+        setup_logging(templates_only_settings)
+        reset_settings_for_testing()
+        init_settings(templates_only_settings)
+        create_mcp_server(templates_only_settings)
+
+        captured = capsys.readouterr()
+        assert "tool_groups_configured" in captured.err
+        assert "templates" in captured.err
+        assert "ceph" in captured.err
 
 
 class TestRunServerSettings:
