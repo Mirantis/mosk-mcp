@@ -63,6 +63,8 @@ dev = [
     "pre-commit>=3.5.0",
     "types-PyYAML>=6.0.0",
     "types-aiofiles>=24.0.0",
+    # Starlette TestClient prefers httpx2; plain httpx triggers StarletteDeprecationWarning
+    "httpx2>=2.0.0",
 ]
 
 e2e = [
