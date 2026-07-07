@@ -161,6 +161,15 @@ class Settings(BaseSettings):
         description="Default Kubernetes namespace for tools that target a namespace.",
     )
 
+    tools: str | None = Field(
+        default=None,
+        description=(
+            "Comma-separated optional tool groups to enable (``MCP_TOOLS``). Unset or empty "
+            "enables all optional groups. Auth and cluster tools are always registered "
+            "separately."
+        ),
+    )
+
     mosk_cluster_name: str | None = Field(
         default=None,
         description='Optional MOSK Cluster CR name on MCC (e.g. ``"mos"``); auto-discovered if unset.',
@@ -505,6 +514,23 @@ class Settings(BaseSettings):
             return None
         s = str(v).strip()
         return None if not s else s
+
+    @field_validator("tools", mode="before")
+    @classmethod
+    def validate_tools_config(cls, v: Any) -> str | None:
+        """Treat blank MCP_TOOLS as unset (all optional groups enabled)."""
+        if v is None or v == "":
+            return None
+        s = str(v).strip()
+        return None if not s else s
+
+    @model_validator(mode="after")
+    def validate_tool_groups(self) -> Settings:
+        """Validate MCP_TOOLS group names at settings construction time."""
+        from mosk_mcp.registration.tool_groups import resolve_tool_groups
+
+        resolve_tool_groups(self.tools)
+        return self
 
     @field_validator(
         "mgmt_url",
