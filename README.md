@@ -1,6 +1,6 @@
 # MOSK MCP Server
 
-> **Minimum Requirements:** MCC 2.28+ | MOSK Platform 25.1+ | Python 3.11+
+> **Minimum Requirements:** MOSK 25.1+ | Python 3.11+
 
 An MCP (Model Context Protocol) server that enables AI assistants like Claude to manage Mirantis OpenStack for Kubernetes (MOSK) clusters through natural conversation. Query cluster health, troubleshoot issues, generate infrastructure templates, and perform operations - all by simply asking.
 
@@ -24,7 +24,7 @@ An MCP (Model Context Protocol) server that enables AI assistants like Claude to
 
 ## Quick Start
 
-> **⚠️ Prerequisite:** Before using the MCP server, enable OAuth 2.0 Device Authorization Grant on your MCC Keycloak `kaas` and `k8s` clients. See [Keycloak Configuration](#keycloak-configuration-device-flow) for steps.
+> **⚠️ Prerequisite:** Before using the MCP server, enable OAuth 2.0 Device Authorization Grant for `kaas` and `k8s` clients in the management cluster's Keycloak. See [Keycloak Configuration](#keycloak-configuration-device-flow) for steps.
 
 ### Option 1: Claude Desktop with Docker (Recommended)
 
@@ -45,9 +45,9 @@ clusters:
     environment: development
     ssl_verify: false
   production:
-    url: https://mcc.example.com
+    url: https://mosk.example.com
     name: Production
-    description: Production MCC cluster
+    description: My production cluster
     environment: production
     ssl_verify: true
 confirm_production_switch: true
@@ -163,7 +163,7 @@ Secure OAuth 2.0 Device Flow authentication - no passwords in chat.
 | `session_status` | View token expiry, roles, connected clusters |
 
 ### Cluster Management (5 tools)
-Manage multiple MCC clusters safely.
+Interact with multiple management clusters safely.
 
 | Tool | Description |
 |------|-------------|
@@ -235,7 +235,7 @@ Monitor deployments, upgrades, and platform operations.
 | `get_openstack_deployment_status` | OSDPL phase and service status |
 | `get_openstack_upgrade_progress` | Per-component upgrade tracking |
 | `get_component_versions` | Current vs target versions |
-| `get_mosk_platform_status` | Cluster CR status from MCC |
+| `get_mosk_platform_status` | Cluster CR status as seen in the management cluster |
 | `get_mosk_platform_upgrade_progress` | K8s/LCM layer upgrade tracking |
 | `list_available_releases` | Available MOSK releases |
 | `list_live_migrations` | Active VM migrations |
@@ -350,48 +350,197 @@ Server health and diagnostics.
 
 ## Configuration
 
-All settings use the `MCP_` prefix as environment variables.
+Server options are loaded from defaults, optional `.env`, process environment variables, and (when you run the `mosk-mcp` / `python -m mosk_mcp` entrypoint) **command-line flags**. Field names map to env vars with the `MCP_` prefix (see `Settings` in `src/mosk_mcp/core/config.py`).
 
-### Core Settings
+### Dotenv file
+
+`DOTENV_PATH` is intentionally **not** `MCP_`-prefixed: it selects which file is merged before other sources (default: `.env` in the **current working directory** when the process starts).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_MCC_URL` | - | MCC URL (not needed if using `clusters.yaml`) |
-| `MCP_SSL_VERIFY` | `true` | Verify SSL certificates |
-| `MCP_LOG_LEVEL` | `INFO` | DEBUG, INFO, WARNING, ERROR |
-| `MCP_TRANSPORT` | `stdio` | stdio, http, streamable-http |
+| `DOTENV_PATH` | `.env` | Path to the dotenv file (relative or absolute) |
+
+### Configuration precedence
+
+When using the **`mosk-mcp`** console script (or `python -m mosk_mcp`), **explicit CLI flags override** environment variables, which override values from `.env`, which override built-in defaults. Run `mosk-mcp --help` for the full list of flags (pydantic-settings builds them from the settings model; options use kebab-case, e.g. `--log-level`).
+
+Common flags and **shortcuts** (equivalent env vars in parentheses):
+
+| Flag | Env var | Description |
+|------|---------|-------------|
+| `--version` | — | Print version and exit |
+| `--transport` | `MCP_TRANSPORT` | `stdio`, `http`, or `streamable-http` |
+| `--http-host`, **`--host`** | `MCP_HTTP_HOST` | HTTP MCP bind address (HTTP transports only) |
+| `--http-port`, **`--port`** | `MCP_HTTP_PORT` | HTTP MCP port |
+| `--log-level` | `MCP_LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `--log-format` | `MCP_LOG_FORMAT` | `json` or `console` |
+| `--environment` | `MCP_ENVIRONMENT` | `development`, `staging`, or `production` (server process) |
+| `--auth-enabled`, **`--no-auth`** | `MCP_AUTH_ENABLED` | Toggle OAuth Device Flow auth (`--no-auth` disables; dev only) |
+| `--metrics-enabled`, **`--no-metrics`** | `MCP_METRICS_ENABLED` | Toggle Prometheus metrics and shared health endpoints |
+| `--metrics-port` | `MCP_METRICS_PORT` | Metrics/health listen port |
+| `--metrics-host` | `MCP_METRICS_HOST` | Metrics/health bind address |
+
+### Environment Variables 
+
+All settings from `src/mosk_mcp/core/config.py` can be configured via environment variables using `MCP_<FIELD_NAME>` (for example, `transport` -> `MCP_TRANSPORT`).
+
+`MCP_CONFIG_PATH` and `MCP_PROFILE` are optional and mainly used for multi-cluster mode via `clusters.yaml`; single-cluster workflows can use `MCP_MGMT_URL` directly.
+
+#### Transport and runtime
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TRANSPORT` | `stdio` | MCP transport: `stdio`, `http`, or `streamable-http` |
+| `MCP_HTTP_HOST` | `0.0.0.0` | Bind address for MCP HTTP server when using HTTP transports |
+| `MCP_HTTP_PORT` | `8080` | TCP port for MCP HTTP server when using HTTP transports |
+| `MCP_ENVIRONMENT` | `development` | Process mode: `development`, `staging`, or `production` |
+
+#### Tool groups
+
+`MCP_TOOLS` controls which **optional** tool groups are registered by the MCP server. Auth tools, cluster management tools, and core utilities (`health_check`, `server_info`, `echo`) are always registered and are not part of this setting.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TOOLS` | *(unset)* | Comma-separated list of optional tool groups to enable. Unset or empty enables all optional groups. |
+
+**Valid group ids:**
+
+| Group id | Tools |
+|----------|-------|
+| `templates` | Template generation (BMH, Machine, OSDPL patch, etc.) |
+| `ceph` | Ceph storage operations |
+| `rabbitmq` | RabbitMQ messaging operations |
+| `nodes` | Node / machine lifecycle |
+| `visibility` | Operations visibility (deployments, upgrades, rollouts) |
+| `health` | Cluster health monitoring |
+| `troubleshooting` | Diagnostics and log analysis |
+| `validation` | Post-upgrade validation |
+
+**Examples:**
+
+```bash
+# Enable only template generation and Ceph tools
+MCP_TOOLS=templates,ceph mosk-mcp
+
+# Enable troubleshooting and validation only
+MCP_TOOLS=troubleshooting,validation mosk-mcp
+```
+
+Invalid group names cause startup to fail with a validation error listing valid ids. At startup the server logs enabled and disabled groups (`tool_groups_configured` at INFO level). The `server_info` tool reports enabled optional groups in its `capabilities` field.
+
+#### Logging and audit
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_LOG_LEVEL` | `INFO` | Minimum log level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `MCP_LOG_FORMAT` | `json` | Log format: `json` or `console` |
+| `MCP_LOG_TO_STDERR_ONLY` | `true` | Send main logs to stderr only (recommended in containers) |
+| `MCP_AUDIT_ENABLED` | `true` | Enable audit event logging |
+| `MCP_AUDIT_LOG_PATH` | `/var/log/mosk-mcp/audit.log` | Audit log file path |
+| `MCP_AUDIT_ROTATION_ENABLED` | `true` | Enable audit log rotation |
+| `MCP_AUDIT_MAX_SIZE_MB` | `100` | Maximum audit log file size (MB) before rotation |
+| `MCP_AUDIT_BACKUP_COUNT` | `10` | Number of rotated audit files to keep |
+| `MCP_AUDIT_ROTATION_WHEN` | `midnight` | Rotation schedule keyword (for example `midnight`, `h`, `d`) |
+
+#### Authentication, cluster, and service endpoint discovery
+
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `MCP_AUTH_ENABLED` | `true` | Enable OAuth 2.0 Device Flow authentication |
-| `MCP_METRICS_ENABLED` | `true` | Enable Prometheus metrics endpoint |
+| `MCP_MGMT_URL` | *(unset)* | Management cluster base URL; required in production unless resolved via cluster profile config |
+| `MCP_KEYCLOAK_URL` | *(unset)* | Optional Keycloak base URL override |
+| `MCP_KEYCLOAK_REALM` | *(unset)* | Optional Keycloak realm override |
+| `MCP_OIDC_CLIENT_ID` | *(unset)* | Optional OIDC client id override (`MCP_MCC_OIDC_CLIENT_ID` deprecated alias) |
+| `MCP_PROMETHEUS_URL` | *(unset)* | Optional Prometheus IAM proxy URL override |
+| `MCP_ALERTMANAGER_URL` | *(unset)* | Optional Alertmanager IAM proxy URL override |
+| `MCP_OPENSEARCH_URL` | *(unset)* | Optional OpenSearch/Kibana IAM proxy URL override |
+| `MCP_MOSK_CLUSTER_NAME` | *(unset)* | Optional MOSK cluster CR name in the management cluster; auto-discovered if unset |
+| `MCP_MOSK_CLUSTER_NAMESPACE` | *(unset)* | Optional namespace for MOSK Cluster/Machine CRs in the management cluster; auto-discovered if unset |
+| `MCP_CONFIG_PATH` | *(unset)* | Path to `clusters.yaml` (runtime default if unset: `~/.config/mosk-mcp/clusters.yaml`) |
+| `MCP_PROFILE` | *(unset)* | Active cluster id override from `clusters.yaml` (`clusters:` key) |
 
-### Device Flow (OAuth 2.0)
+#### MOSK API clients settings
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_DEVICE_FLOW_ENABLED` | `true` | Enable browser-based auth |
-| `MCP_DEVICE_FLOW_CLIENT_ID` | `kaas` | Keycloak client ID |
-| `MCP_DEVICE_FLOW_CODE_LIFESPAN` | `600` | Login code validity (seconds) |
+| `MCP_SSL_VERIFY` | `true` | Verify TLS certificates for API calls |
+| `MCP_SSL_CA_CERT_PATH` | *(unset)* | Optional custom CA bundle path |
+| `MCP_REQUEST_TIMEOUT` | `30` | Default outbound HTTP/API timeout in seconds |
+| `MCP_MAX_RETRIES` | `3` | Maximum retry attempts for transient outbound request failures |
+| `MCP_KUBERNETES_NAMESPACE` | `default` | Default namespace for tools interacting with K8s APIs |
 
-### Privacy Protection
-
-Automatic data redaction when using cloud LLM providers.
+#### MCP server metrics and health checks
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MCP_PRIVACY_ENABLED` | `false` | Enable privacy protection |
-| `MCP_PRIVACY_LEVEL` | `standard` | none, minimal, standard, aggressive |
+| `MCP_METRICS_ENABLED` | `true` | Enable Prometheus metrics and shared health endpoints |
+| `MCP_METRICS_HOST` | `0.0.0.0` | Bind address for metrics/health server |
+| `MCP_METRICS_PORT` | `9090` | TCP port for metrics/health server |
+| `MCP_HEALTH_CHECK_TIMEOUT_SECONDS` | `10` | Per-probe health check timeout in seconds |
+| `MCP_HEALTH_CHECK_K8S_ENABLED` | `true` | Include Kubernetes API connectivity in health checks |
+
+#### Rate limiting and graceful shutdown
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_RATE_LIMIT_ENABLED` | `true` | Enable per-client rate limiting on HTTP transports |
+| `MCP_RATE_LIMIT_REQUESTS_PER_MINUTE` | `60` | Sustained per-client request limit per minute |
+| `MCP_RATE_LIMIT_BURST_SIZE` | `10` | Allowed burst above sustained rate |
+| `MCP_SHUTDOWN_TIMEOUT` | `60` | Max seconds to wait for in-flight work during shutdown |
+| `MCP_DRAIN_TIMEOUT` | `30` | Seconds to drain connections before force close |
+
+#### Connection pool and circuit breaker
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_CONNECTION_POOL_SIZE` | `10` | Maximum concurrent connections in shared HTTP client pool |
+| `MCP_CONNECTION_POOL_TIMEOUT` | `30` | Seconds to wait when acquiring a pooled connection |
+| `MCP_CONNECTION_HEALTH_CHECK_INTERVAL` | `60` | Seconds between idle connection health checks |
+| `MCP_CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` | Consecutive failures before circuit opens |
+| `MCP_CIRCUIT_BREAKER_RECOVERY_TIMEOUT` | `30` | Seconds before half-open recovery attempts |
+
+#### OpenTelemetry
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_OTEL_ENABLED` | `false` | Enable trace export |
+| `MCP_OTEL_SERVICE_NAME` | `mosk-mcp` | Service name attached to spans |
+| `MCP_OTEL_EXPORTER_ENDPOINT` | *(unset)* | OTLP collector URL; required when `MCP_OTEL_ENABLED=true` |
+
+#### Device Flow (OAuth 2.0) Authentication for MOSK API clients
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_DEVICE_FLOW_ENABLED` | `true` | Enable browser-based Device Flow login |
+| `MCP_DEVICE_FLOW_CLIENT_ID` | `kaas` | OAuth client id used for Device Flow |
+| `MCP_DEVICE_FLOW_CODE_LIFESPAN` | `600` | Device code lifetime in seconds |
+| `MCP_DEVICE_FLOW_POLL_INTERVAL` | `5` | Poll interval (seconds) while waiting for authorization |
+| `MCP_DEVICE_FLOW_MAX_POLL_ATTEMPTS` | `0` | Maximum poll attempts (`0` means unlimited until code expiry) |
+| `MCP_DEVICE_FLOW_SCOPE` | `openid profile email offline_access` | Space-separated OAuth scopes |
+
+#### Privacy redaction
+
+Automatic data redaction for tool outputs before they are sent to the LLM.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_PRIVACY_ENABLED` | `false` | Enable privacy redaction |
+| `MCP_PRIVACY_LEVEL` | `standard` | Redaction level: `none`, `minimal`, `standard`, `aggressive` |
+| `MCP_PRIVACY_REDACT_UUID` | `false` | Also redact UUIDs (implicitly true with aggressive profile behavior) |
+| `MCP_PRIVACY_PRESERVE_STRUCTURE` | `true` | Keep structured placeholders (for example `[IP-1]`) |
 
 ---
 
 ## Keycloak Configuration (Device Flow)
 
-The MOSK MCP Server uses OAuth 2.0 Device Authorization Flow for secure browser-based authentication. This requires enabling a single setting on two MCC Keycloak clients.
+The MOSK MCP Server uses OAuth 2.0 Device Authorization Flow for secure browser-based authentication. This requires enabling it on two clients in the management cluster's Keycloak.
 
 ### Enable Device Authorization Grant
 
 **Step 1: Access Keycloak Admin Console**
 
 ```
-https://<mcc-url>/auth/admin/
+https://<mgmt-url>/auth/admin/
 ```
 
 Login with Keycloak admin credentials.
@@ -411,13 +560,13 @@ Login with Keycloak admin credentials.
 3. Enable ✅ **OAuth 2.0 Device Authorization Grant**
 4. Click **Save**
 
-> **Note:** Both clients must have this setting enabled for full MCC/MOSK authentication support.
+> **Note:** Both clients must have this setting enabled for full authentication support.
 
 **Step 4: Verify Configuration**
 
 Test the device authorization endpoint:
 ```bash
-curl -k https://<mcc-url>/auth/realms/iam/protocol/openid-connect/auth/device
+curl -k https://<mgmt-url>/auth/realms/iam/protocol/openid-connect/auth/device
 ```
 
 A successful response returns JSON (not a 404 error).
@@ -426,13 +575,13 @@ A successful response returns JSON (not a 404 error).
 
 | Endpoint | URL |
 |----------|-----|
-| **Device Authorization** | `https://<mcc>/auth/realms/iam/protocol/openid-connect/auth/device` |
-| **Token** | `https://<mcc>/auth/realms/iam/protocol/openid-connect/token` |
-| **UserInfo** | `https://<mcc>/auth/realms/iam/protocol/openid-connect/userinfo` |
+| **Device Authorization** | `https://<kc-mgmt>/auth/realms/iam/protocol/openid-connect/auth/device` |
+| **Token** | `https://<kc-mgmt>/auth/realms/iam/protocol/openid-connect/token` |
+| **UserInfo** | `https://<kc-mgmt>/auth/realms/iam/protocol/openid-connect/userinfo` |
 
 ### Token Lifespans
 
-Default MCC Keycloak settings:
+Default Keycloak settings:
 - Access token: 5 minutes
 - Refresh token: 30 minutes
 
@@ -442,7 +591,7 @@ The MCP server automatically handles token refresh.
 
 ## Multi-Cluster Management
 
-Manage multiple MCC clusters with safe switching.
+Interact with multiple management clusters with safe switching.
 
 ### Configuration File
 
@@ -464,17 +613,17 @@ clusters:
     is_locked: false
 
   production-us:
-    url: https://mcc-us.example.com
+    url: https://mosk-us.example.com
     name: Production US
-    description: US production MCC cluster
+    description: US production MOSK cloud
     environment: production
     ssl_verify: true
     is_locked: false
 
   production-eu:
-    url: https://mcc-eu.example.com
+    url: https://mosk-eu.example.com
     name: Production EU
-    description: EU production MCC cluster
+    description: EU production MOSK cloud
     environment: production
     ssl_verify: true
     is_locked: false
@@ -489,7 +638,7 @@ Claude: You have 3 configured clusters:
         - production-eu (production)
 
 You: "Switch to production-us"
-Claude: Switching from internal-cloud-us to internal-cloud-eu.
+Claude: Switching from lab to production-us.
         This is a PRODUCTION cluster. Session will be cleared.
         Confirm switch? [Yes/No]
 ```
@@ -547,7 +696,7 @@ Claude Desktop manages the container lifecycle automatically. Configure via `cla
 ./scripts/docker-build.sh --local
 
 # Start in HTTP mode for testing
-./scripts/docker-run.sh start --mcc-url https://mcc.example.com
+./scripts/docker-run.sh start --mgmt-url https://mgmt.example.com
 
 # Status, logs, stop
 ./scripts/docker-run.sh status
@@ -560,10 +709,10 @@ Claude Desktop manages the container lifecycle automatically. Configure via `cla
 ## Architecture
 
 ```
-┌─────────────────┐     ┌─────────────────┐
-│   Claude/MCP    │     │    Keycloak     │
-│     Client      │────▶│   (OIDC Auth)   │
-└────────┬────────┘     └─────────────────┘
+┌───────────────────┐     ┌─────────────────┐
+│   Claude Desktop  │     │    Keycloak     │
+│   Cursor IDE      │────▶│   (OIDC Auth)   │
+└────────┬──────────┘     └─────────────────┘
          │
          ▼
 ┌─────────────────┐
@@ -571,22 +720,25 @@ Claude Desktop manages the container lifecycle automatically. Configure via `cla
 │  Server         │
 └────────┬────────┘
          │
-    ┌────┴────┐
-    ▼         ▼
-┌───────┐ ┌───────┐
-│  MCC  │ │ MOSK  │
-│Cluster│ │Cluster│
-└───────┘ └───────┘
+    ┌────┴───────────┐
+    ▼                ▼
+┌──────────────┐ ┌──────────┐
+│  Management  │ │  MOSK    │
+│  Cluster     │ │  Cluster │
+└──────────────┘ └──────────┘
 ```
 
-**MCC (Management Cluster):** Runs LCM controllers, hosts Machine/BMHi/BMHp CRs
-**MOSK (Workload Cluster):** Runs OpenStack services, hosts OSDPL, Ceph
+** (MOSK) Management Cluster:** Perform life cycle management (LCM) for each cluster in the cloud
+** MOSK Cluster:** Runs OpenStack, SDS (Ceph), SDN; hosts tenant workloads (VMs)
 
 ---
 
 ## Development
 
 ```bash
+# CLI and env (local install)
+mosk-mcp --help
+
 # Run tests
 pytest tests/ -v
 
@@ -605,7 +757,7 @@ mypy src
 
 **Connection refused:**
 ```bash
-curl -k https://your-mcc-url/config.js
+curl -k https://your-mgmt-url/config.js
 ```
 
 **SSL certificate errors:**

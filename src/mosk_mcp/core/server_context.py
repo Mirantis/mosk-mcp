@@ -451,7 +451,7 @@ class SSOServerContext:
                 settings=self.settings,
                 keycloak_url=self.settings.keycloak_url,
                 realm=self.settings.keycloak_realm,
-                mcc_client_id=self.settings.mcc_oidc_client_id,
+                oidc_client_id=self.settings.oidc_client_id,
             )
 
         # Create device flow manager
@@ -945,7 +945,8 @@ async def create_sso_server_context(
     Factory function for SSO-authenticated server context.
 
     Args:
-        settings: Application settings (uses get_settings() if None).
+        settings: Application settings (uses :func:`get_settings` if None; requires
+            :func:`init_settings` to have been called).
         config: Optional context configuration.
 
     Returns:

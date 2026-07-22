@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -39,6 +38,7 @@ from mosk_mcp.cluster.config import (
     ClusterEnvironment,
     ClustersConfig,
 )
+from mosk_mcp.core.config import get_settings
 from mosk_mcp.cluster.models import (
     AddClusterInput,
     AddClusterOutput,
@@ -93,27 +93,22 @@ class ClusterManager:
     - Audit logging
     """
 
-    # Default config file location
-    DEFAULT_CONFIG_PATH = Path.home() / ".config" / "mosk-mcp" / "clusters.yaml"
-
-    # Environment variable for config path override
-    CONFIG_PATH_ENV = "MCP_CONFIG_PATH"
-
-    # Environment variable for profile override
-    PROFILE_ENV = "MCP_PROFILE"
-
     def __init__(
         self,
         config_path: Path | None = None,
+        profile_override: str | None = None,
         session_manager: SessionManager | None = None,
     ):
         """Initialize cluster manager.
 
         Args:
-            config_path: Path to clusters.yaml (defaults to ~/.config/mosk-mcp/)
+            config_path: Path to clusters.yaml (defaults to None)
+            profile_override: Active cluster id override
             session_manager: Session manager for auth state (optional)
+            
         """
-        self._config_path = config_path or self._get_config_path()
+        self._config_path = config_path
+        self._profile_override = profile_override
         self._session_manager = session_manager
         self._config: ClustersConfig | None = None
         self._lock = asyncio.Lock()
@@ -128,14 +123,6 @@ class ClusterManager:
                 "config_exists": self._config_path.exists(),
             },
         )
-
-    @classmethod
-    def _get_config_path(cls) -> Path:
-        """Get config path from environment or default."""
-        env_path = os.environ.get(cls.CONFIG_PATH_ENV)
-        if env_path:
-            return Path(env_path)
-        return cls.DEFAULT_CONFIG_PATH
 
     @property
     def config_path(self) -> Path:
@@ -169,8 +156,8 @@ class ClusterManager:
                     extra={"path": str(self._config_path)},
                 )
 
-            # Check for profile override from environment
-            profile_override = os.environ.get(self.PROFILE_ENV)
+            # Apply profile override from settings (or constructor)
+            profile_override = self._profile_override
             if (
                 profile_override
                 and profile_override in self._config.clusters
@@ -179,7 +166,6 @@ class ClusterManager:
                 logger.info(
                     "cluster_profile_override",
                     extra={
-                        "env_var": self.PROFILE_ENV,
                         "profile": profile_override,
                         "previous": self._config.active,
                     },
@@ -668,19 +654,39 @@ class ClusterManager:
         return target, lock
 
 
-# Global instance (lazy initialized)
+# Global instance (lazy initialized; tied to current :func:`~mosk_mcp.core.config.get_settings` object)
 _cluster_manager: ClusterManager | None = None
+_cluster_manager_settings_id: int | None = None
 
 
 def get_cluster_manager() -> ClusterManager:
-    """Get the global cluster manager instance."""
-    global _cluster_manager
-    if _cluster_manager is None:
-        _cluster_manager = ClusterManager()
+    """Return the process-wide cluster manager for the current settings snapshot.
+
+    The manager is built from :func:`~mosk_mcp.core.config.get_settings` (``config_path`` and ``profile``).
+    After a new :func:`~mosk_mcp.core.config.init_settings` (e.g. in tests via
+    :func:`~mosk_mcp.core.config.reset_settings_for_testing` then ``init_settings``), the
+    active ``Settings`` object is replaced; a new :class:`ClusterManager` is created on the next call
+    so cluster configuration matches the new settings.
+    """
+    global _cluster_manager, _cluster_manager_settings_id
+    settings = get_settings()
+    sid = id(settings)
+    if _cluster_manager is None or _cluster_manager_settings_id != sid:
+        resolved_path = (
+            settings.config_path
+            if settings.config_path is not None
+            else ClusterManager.DEFAULT_CONFIG_PATH
+        )
+        _cluster_manager = ClusterManager(
+            config_path=resolved_path,
+            profile_override=settings.profile,
+        )
+        _cluster_manager_settings_id = sid
     return _cluster_manager
 
 
 def reset_cluster_manager() -> None:
     """Reset the global cluster manager (for testing)."""
-    global _cluster_manager
+    global _cluster_manager, _cluster_manager_settings_id
     _cluster_manager = None
+    _cluster_manager_settings_id = None

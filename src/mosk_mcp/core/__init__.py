@@ -14,6 +14,7 @@ from mosk_mcp.core.config import (
     Settings,
     TransportType,
     get_settings,
+    init_settings,
 )
 from mosk_mcp.core.exceptions import (
     AuthenticationError,
@@ -32,7 +33,6 @@ from mosk_mcp.core.server_context import (
     ServerContextConfig,
     SSOServerContext,
 )
-
 
 __all__ = [
     # Exceptions
@@ -54,4 +54,5 @@ __all__ = [
     "UnsupportedVersionError",
     "ValidationError",
     "get_settings",
+    "init_settings",
 ]

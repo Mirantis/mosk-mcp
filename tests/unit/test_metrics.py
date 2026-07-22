@@ -13,6 +13,7 @@ import time
 
 import pytest
 
+from mosk_mcp import __version__
 from mosk_mcp.core.config import Environment, LogFormat, LogLevel, Settings, TransportType
 from mosk_mcp.observability.metrics import (
     MetricsRegistry,
@@ -32,8 +33,6 @@ from mosk_mcp.observability.metrics import (
 def metrics_settings() -> Settings:
     """Create settings for metrics tests."""
     return Settings(
-        app_name="mosk-mcp-test",
-        app_version="0.1.0-test",
         transport=TransportType.STDIO,
         log_level=LogLevel.DEBUG,
         log_format=LogFormat.CONSOLE,
@@ -261,8 +260,8 @@ class TestMetricsRegistry:
         metrics_output = metrics_registry.generate_metrics().decode()
 
         assert "mosk_mcp_server_info{" in metrics_output
-        assert 'version="0.1.0-test"' in metrics_output
-        assert 'app_name="mosk-mcp-test"' in metrics_output
+        assert f'version="{__version__}"' in metrics_output
+        assert 'app_name="mosk-mcp"' in metrics_output
 
 
 class TestMetricsRegistryGlobalFunctions:

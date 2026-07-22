@@ -217,7 +217,7 @@ class DeviceFlowLoginManager:
         settings: Settings,
         session: UserSession,
         *,
-        mcc_url_override: str | None = None,
+        mgmt_url_override: str | None = None,
         ssl_verify_override: bool | None = None,
     ) -> None:
         """Initialize dual device flow manager.
@@ -225,21 +225,21 @@ class DeviceFlowLoginManager:
         Args:
             settings: Application settings.
             session: User session to authenticate.
-            mcc_url_override: Override MCC URL (from cluster config).
+            mgmt_url_override: Override management cluster URL (from cluster config).
             ssl_verify_override: Override SSL verify setting (from cluster config).
         """
         self.settings = settings
         self.session = session
 
         # URL overrides from cluster config
-        self._mcc_url_override = mcc_url_override
+        self._mgmt_url_override = mgmt_url_override
         self._ssl_verify_override = ssl_verify_override
 
         logger.debug(
             "device_flow_manager_initialized",
-            mcc_url_override=mcc_url_override,
+            mgmt_url_override=mgmt_url_override,
             ssl_verify_override=ssl_verify_override,
-            settings_mcc_url=settings.mcc_url,
+            settings_mgmt_url=settings.mgmt_url,
             settings_ssl_verify=settings.ssl_verify,
         )
 
@@ -256,15 +256,15 @@ class DeviceFlowLoginManager:
         self._mosk_oidc_info: ClusterOIDCInfo | None = None
 
     @property
-    def mcc_url(self) -> str | None:
-        """Get effective MCC URL (override or settings).
+    def mgmt_url(self) -> str | None:
+        """Get effective management cluster URL (override or settings).
 
         Uses explicit None check to properly handle cluster config override.
-        This ensures cluster config URL is used even if settings.mcc_url is also set.
+        This ensures cluster config URL is used even if settings.mgmt_url is also set.
         """
-        if self._mcc_url_override is not None:
-            return self._mcc_url_override
-        return self.settings.mcc_url
+        if self._mgmt_url_override is not None:
+            return self._mgmt_url_override
+        return self.settings.mgmt_url
 
     @property
     def ssl_verify(self) -> bool:
@@ -456,31 +456,31 @@ class DeviceFlowLoginManager:
         """Discover MCC endpoints from config.js."""
         logger.debug(
             "discover_endpoints_url_sources",
-            mcc_url_override=self._mcc_url_override,
-            settings_mcc_url=self.settings.mcc_url,
-            effective_mcc_url=self.mcc_url,
+            mgmt_url_override=self._mgmt_url_override,
+            settings_mgmt_url=self.settings.mgmt_url,
+            effective_mgmt_url=self.mgmt_url,
         )
 
-        mcc_url = self.mcc_url
-        if not mcc_url:
+        mgmt_url = self.mgmt_url
+        if not mgmt_url:
             raise ToolExecutionError(
                 message=(
-                    "MCC URL not configured. Set MCP_MCC_URL environment variable "
+                    "Management cluster URL not configured. Set MCP_MGMT_URL environment variable "
                     "or configure a cluster with 'add_cluster'. "
-                    f"Override: {self._mcc_url_override!r}, "
-                    f"Settings: {self.settings.mcc_url!r}"
+                    f"Override: {self._mgmt_url_override!r}, "
+                    f"Settings: {self.settings.mgmt_url!r}"
                 ),
                 tool_name="login",
                 details={
-                    "config_key": "mcc_url",
-                    "mcc_url_override": self._mcc_url_override,
-                    "settings_mcc_url": self.settings.mcc_url,
+                    "config_key": "mgmt_url",
+                    "mgmt_url_override": self._mgmt_url_override,
+                    "settings_mgmt_url": self.settings.mgmt_url,
                 },
             )
 
-        logger.debug("discovering_mcc_endpoints", mcc_url=mcc_url)
+        logger.debug("discovering_mcc_endpoints", mgmt_url=mgmt_url)
         self._mcc_endpoints = await discover_mcc_endpoints(
-            mcc_ui_url=mcc_url,
+            mcc_ui_url=mgmt_url,
             verify_ssl=self.ssl_verify,
         )
 

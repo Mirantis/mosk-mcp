@@ -12,11 +12,11 @@
 #   config     Show or validate cluster configuration
 #
 # Examples:
-#   # Start with default MCC URL (from environment or clusters.yaml)
+#   # Start with default management cluster URL (from environment or clusters.yaml)
 #   ./scripts/docker-run.sh start
 #
-#   # Start with specific MCC URL (legacy single-cluster mode)
-#   ./scripts/docker-run.sh start --mcc-url https://mcc.example.com
+#   # Start with specific management cluster URL (legacy single-cluster mode)
+#   ./scripts/docker-run.sh start --mgmt-url https://mcc.example.com
 #
 #   # Start with multi-cluster config file
 #   ./scripts/docker-run.sh start --config ~/.config/mosk-mcp/clusters.yaml
@@ -72,7 +72,7 @@ COMMANDS:
     help        Show this help message
 
 OPTIONS:
-    --mcc-url URL           MCC cluster URL (single-cluster mode - no config needed)
+    --mgmt-url URL           Management cluster URL (single-cluster mode - no config needed)
     --ssl-verify true|false SSL verification (default: true)
     --config FILE           Path to clusters.yaml config file
     --profile NAME          Cluster profile to activate (from config)
@@ -85,10 +85,10 @@ OPTIONS:
     --debug                 Enable debug logging
 
 SINGLE-CLUSTER MODE (simplest):
-    Use --mcc-url to connect to one cluster. No config file needed.
+    Use --mgmt-url to connect to one cluster. No config file needed.
 
-    ./scripts/docker-run.sh start --mcc-url https://mcc.example.com
-    ./scripts/docker-run.sh start --mcc-url https://172.16.166.22 --ssl-verify false
+    ./scripts/docker-run.sh start --mgmt-url https://mcc.example.com
+    ./scripts/docker-run.sh start --mgmt-url https://172.16.166.22 --ssl-verify false
 
 MULTI-CLUSTER MODE:
     Configure multiple clusters in ~/.config/mosk-mcp/clusters.yaml
@@ -124,7 +124,7 @@ MULTI-CLUSTER MODE:
       - production: HTTPS required, SSL verify required
 
 ENVIRONMENT VARIABLES:
-    MCP_MCC_URL             Single-cluster mode (bypasses config file)
+    MCP_MGMT_URL             Single-cluster mode (bypasses config file)
     MCP_SSL_VERIFY          SSL verification (true/false)
     MCP_PROFILE             Active cluster from config file
     MCP_AUTH_ENABLED        Enable authentication (default: true)
@@ -134,10 +134,10 @@ ENVIRONMENT VARIABLES:
 
 EXAMPLES:
     # Single cluster - quickest way to get started
-    ./scripts/docker-run.sh start --mcc-url https://mcc.example.com
+    ./scripts/docker-run.sh start --mgmt-url https://mcc.example.com
 
     # Single cluster with SSL disabled (for self-signed certs)
-    ./scripts/docker-run.sh start --mcc-url https://172.16.166.22 --ssl-verify false
+    ./scripts/docker-run.sh start --mgmt-url https://172.16.166.22 --ssl-verify false
 
     # Multi-cluster - use config file
     ./scripts/docker-run.sh start
@@ -148,7 +148,7 @@ EXAMPLES:
     MCP_PROFILE=internal-cloud-eu ./scripts/docker-run.sh start
 
     # Start in background
-    ./scripts/docker-run.sh start -d --mcc-url https://mcc.example.com
+    ./scripts/docker-run.sh start -d --mgmt-url https://mcc.example.com
 
     # View logs
     ./scripts/docker-run.sh logs -f
@@ -172,12 +172,12 @@ create_sample_config() {
         cat > "$CONFIG_FILE" << 'YAML'
 # MOSK MCP Server - Multi-Cluster Configuration
 #
-# This file defines MCC clusters you can connect to.
+# This file defines management clusters you can connect to.
 # Use 'list_clusters' and 'switch_cluster' tools to manage clusters.
 #
 # SINGLE-CLUSTER MODE:
 #   If you only use one cluster, you can skip this file entirely and use:
-#   ./scripts/docker-run.sh start --mcc-url https://your-mcc-url
+#   ./scripts/docker-run.sh start --mgmt-url https://your-mgmt-url
 #
 # MULTI-CLUSTER MODE:
 #   Define your clusters below. Cluster IDs can be any name you want.
@@ -188,7 +188,7 @@ create_sample_config() {
 #
 # Environment variables:
 #   MCP_PROFILE - Override active cluster (e.g., MCP_PROFILE=internal-cloud-eu)
-#   MCP_MCC_URL - Single-cluster mode (bypasses this config file)
+#   MCP_MGMT_URL - Single-cluster mode (bypasses this config file)
 
 # Currently active cluster (can be overridden by MCP_PROFILE env var)
 active: null  # Set to your default cluster ID
@@ -233,14 +233,14 @@ clusters: {}
   #   ssl_verify: false
 YAML
         log_info "Sample config created: $CONFIG_FILE"
-        log_info "For single-cluster use: ./scripts/docker-run.sh start --mcc-url https://your-url"
+        log_info "For single-cluster use: ./scripts/docker-run.sh start --mgmt-url https://your-url"
         log_info "For multi-cluster use: Edit $CONFIG_FILE and add your clusters"
     fi
 }
 
 cmd_start() {
     local DETACH=""
-    local MCC_URL=""
+    local MGMT_URL=""
     local SSL_VERIFY=""
     local PROFILE=""
     local DEV_IMAGE=""
@@ -250,8 +250,8 @@ cmd_start() {
     # Parse options
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --mcc-url)
-                MCC_URL="$2"
+            --mgmt-url)
+                MGMT_URL="$2"
                 shift 2
                 ;;
             --ssl-verify)
@@ -334,9 +334,9 @@ cmd_start() {
     DOCKER_CMD+=(-e "MCP_TRANSPORT=${TRANSPORT}")
     DOCKER_CMD+=(-e "MCP_AUTH_ENABLED=true")
 
-    # Single-cluster mode with --mcc-url
-    if [ -n "$MCC_URL" ]; then
-        DOCKER_CMD+=(-e "MCP_MCC_URL=${MCC_URL}")
+    # Single-cluster mode with --mgmt-url
+    if [ -n "$MGMT_URL" ]; then
+        DOCKER_CMD+=(-e "MCP_MGMT_URL=${MGMT_URL}")
         log_info "Using single-cluster mode"
     fi
 
@@ -380,9 +380,9 @@ cmd_start() {
     echo "  Transport:      ${TRANSPORT}"
     echo "  HTTP Port:      ${HTTP_PORT}"
     [ -z "$NO_METRICS" ] && echo "  Metrics Port:   ${METRICS_PORT}"
-    if [ -n "$MCC_URL" ]; then
+    if [ -n "$MGMT_URL" ]; then
         echo "  Mode:           Single-cluster"
-        echo "  MCC URL:        ${MCC_URL}"
+        echo "  Mgmt URL:       ${MGMT_URL}"
         echo "  SSL Verify:     ${SSL_VERIFY:-true}"
     else
         echo "  Mode:           Multi-cluster"

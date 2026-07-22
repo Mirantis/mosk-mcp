@@ -21,6 +21,7 @@ Usage:
 
 from __future__ import annotations
 
+from mosk_mcp._version import __version__
 from mosk_mcp.core.exceptions import (
     AuthenticationError,
     AuthorizationError,
@@ -35,7 +36,6 @@ from mosk_mcp.core.exceptions import (
 )
 
 
-__version__ = "0.1.0"
 __all__ = [
     # Auth exceptions
     "AuthenticationError",

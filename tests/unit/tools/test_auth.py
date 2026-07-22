@@ -368,7 +368,7 @@ class TestDeviceFlowLoginManager:
     def mock_settings(self) -> MagicMock:
         """Create mock settings."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.ssl_verify = True
         settings.device_flow_scope = "openid"
         settings.device_flow_max_poll_attempts = 60
@@ -393,7 +393,7 @@ class TestDeviceFlowLoginManager:
 
         assert manager.settings == mock_settings
         assert manager.session == mock_manager_session
-        assert manager.mcc_url == "https://mcc.example.com"
+        assert manager.mgmt_url == "https://mcc.example.com"
         assert manager.ssl_verify is True
 
     def test_manager_url_override(
@@ -405,11 +405,11 @@ class TestDeviceFlowLoginManager:
         manager = DeviceFlowLoginManager(
             mock_settings,
             mock_manager_session,
-            mcc_url_override="https://override.example.com",
+            mgmt_url_override="https://override.example.com",
             ssl_verify_override=False,
         )
 
-        assert manager.mcc_url == "https://override.example.com"
+        assert manager.mgmt_url == "https://override.example.com"
         assert manager.ssl_verify is False
 
     def test_is_flow_active_no_auth(
@@ -461,7 +461,7 @@ class TestDeviceFlowModuleFunctions:
     def flow_settings(self) -> MagicMock:
         """Create mock settings."""
         settings = MagicMock()
-        settings.mcc_url = "https://mcc.example.com"
+        settings.mgmt_url = "https://mcc.example.com"
         settings.ssl_verify = True
         return settings
 

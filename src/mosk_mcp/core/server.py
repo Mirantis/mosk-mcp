@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 from fastmcp import FastMCP
 from pydantic import Field
 
-from mosk_mcp.core.config import Settings, TransportType, get_settings
+from mosk_mcp.core.config import Settings, TransportType, get_settings, init_settings
 from mosk_mcp.core.exceptions import (
     AuthenticationError,
     AuthorizationError,
@@ -36,8 +36,6 @@ from mosk_mcp.privacy.middleware import create_privacy_middleware
 from mosk_mcp.registration.models import ServerHealthResult, ServerInfo
 from mosk_mcp.registration.tools import (
     register_auth_tools,
-    register_ceph_operations_tools,
-    register_cluster_health_tools,
     register_cluster_tools,
     register_messaging_operations_tools,
     register_node_lifecycle_tools,
@@ -47,7 +45,12 @@ from mosk_mcp.registration.tools import (
     register_validation_tools,
     register_kubectl_tools,
 )
-
+from mosk_mcp.registration.tool_groups import (
+    ToolGroup,
+    register_tool_groups,
+    resolve_tool_groups,
+    tool_group_registration_summary,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
@@ -100,7 +103,8 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
     based on the user's OIDC tokens.
 
     Args:
-        settings: Application settings. If None, loads from environment.
+        settings: Application settings. If None, uses :func:`get_settings` (requires
+            :func:`init_settings` to have been called first).
 
     Returns:
         Configured FastMCP server instance.
@@ -121,7 +125,7 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
         version=settings.app_version,
         transport=settings.transport.value,
         environment=settings.environment.value,
-        mcc_url=settings.mcc_url,
+        mgmt_url=settings.mgmt_url,
     )
 
     # Create server context configuration from settings
@@ -159,7 +163,7 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
 
         logger.info(
             "sso_server_context_ready",
-            mcc_url=settings.mcc_url,
+            mgmt_url=settings.mgmt_url,
             keycloak_url=settings.keycloak_url,
             health_monitoring=context_config.enable_health_monitoring,
             cache_enabled=context_config.enable_cache_cleanup,
@@ -184,7 +188,8 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
 
     # Register tools with the shared context getter
     # We pass the get_server_context function instead of the context object itself
-    _register_tools(mcp, settings, get_server_context)
+    enabled_tool_groups = resolve_tool_groups(settings.tools)
+    _register_tools(mcp, settings, get_server_context, enabled_tool_groups)
 
     # Register tool execution logging middleware
     # This middleware logs all tool calls to stderr for docker logs visibility
@@ -205,13 +210,17 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
             enabled=settings.privacy_enabled,
         )
 
-    logger.info("server_initialized", tool_count=len(mcp._tool_manager._tools))
+    # FastMCP 3.x: list_tools() is async; tool count is not available in sync context
+    logger.info("server_initialized")
 
     return mcp
 
 
 def _register_tools(
-    mcp: FastMCP, settings: Settings, context_getter: Callable[[], SSOServerContext | None]
+    mcp: FastMCP,
+    settings: Settings,
+    context_getter: Callable[[], SSOServerContext | None],
+    enabled_tool_groups: frozenset[ToolGroup],
 ) -> None:
     """Register all tools with the MCP server.
 
@@ -219,7 +228,9 @@ def _register_tools(
         mcp: FastMCP server instance.
         settings: Application settings.
         context_getter: Function that returns the current global SSOServerContext.
+        enabled_tool_groups: Optional tool groups enabled via ``MCP_TOOLS``.
     """
+    enabled_group_ids = sorted(g.value for g in enabled_tool_groups)
 
     # Health check tool - always available
     @mcp.tool(
@@ -237,7 +248,7 @@ def _register_tools(
         async with LoggingContext(request_id=request_id, tool_name="health_check"):
             logger.debug("health_check_started")
 
-            checks: dict[str, Any] = {}
+            checks: dict[str, dict] = {}
 
             # Check basic functionality
             checks["server"] = {"status": "healthy", "message": "Server is running"}
@@ -263,6 +274,7 @@ def _register_tools(
             )
 
             logger.info("health_check_completed", status=status)
+
             return result
 
     # Server info tool
@@ -281,15 +293,7 @@ def _register_tools(
         async with LoggingContext(request_id=request_id, tool_name="server_info"):
             logger.debug("server_info_requested")
 
-            # List of tool categories that will be available
-            capabilities = [
-                "template_generation",  # Generate K8s CRs
-                "node_lifecycle",  # Machine management
-                "ceph_operations",  # Storage operations
-                "visibility",  # Cluster status
-                "health",  # Health monitoring
-                "troubleshooting",  # Diagnostics
-            ]
+            capabilities = enabled_group_ids
 
             # Get MOSK version info if available (populated after login)
             version_info = get_cached_version_info()
@@ -336,16 +340,9 @@ def _register_tools(
     # =========================================================================
 
     register_auth_tools(mcp, settings, context_getter)
-
-    # =========================================================================
-    # Cluster Management Tools (Multi-cluster support)
-    # =========================================================================
-
     register_cluster_tools(mcp, settings, context_getter)
 
-    # =========================================================================
-    # Template Generation Tools (READ_ONLY)
-    # =========================================================================
+    register_tool_groups(mcp, settings, context_getter, enabled_tool_groups)
 
     register_template_generation_tools(mcp)
 
@@ -512,12 +509,15 @@ async def run_server(settings: Settings | None = None) -> None:
     5. Clean up resources and exit
 
     Args:
-        settings: Application settings. If None, loads from environment.
+        settings: Application settings. If None, default :class:`Settings` is built from
+            environment and dotenv, then installed via :func:`init_settings` so :func:`get_settings`
+            matches the running server.
     """
     import asyncio
 
-    if settings is None:
-        settings = get_settings()
+    resolved = settings if settings is not None else Settings()
+    init_settings(resolved)
+    settings = get_settings()
 
     # Initialize shutdown manager first
     from mosk_mcp.infrastructure.shutdown import GracefulShutdownManager, set_shutdown_manager
