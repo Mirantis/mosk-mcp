@@ -45,6 +45,7 @@ from mosk_mcp.registration.tools import (
     register_template_generation_tools,
     register_troubleshooting_tools,
     register_validation_tools,
+    register_kubectl_tools,
 )
 
 
@@ -390,6 +391,12 @@ def _register_tools(
 
     register_validation_tools(mcp, settings, context_getter)
 
+    # =========================================================================
+    # Kubectl-Compatible Tools (READ_ONLY)
+    # =========================================================================
+
+    register_kubectl_tools(mcp, settings, context_getter)
+
     logger.debug(
         "tools_registered",
         tools=[
@@ -485,6 +492,8 @@ def _register_tools(
             "run_smoke_test",
             "run_post_upgrade_validation",
             "run_mosk_platform_validation",
+            # Kubectl tools (1)
+            "kubectl_get",
         ],
     )
 

@@ -11,6 +11,7 @@ This package contains tool registration functions organized by category:
 - cluster_health: Cluster health monitoring tools
 - troubleshooting: Troubleshooting and diagnostics tools
 - validation: Post-upgrade validation tools
+- kubectl: Kubectl-compatible Kubernetes resource tools
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from mosk_mcp.registration.tools.node_lifecycle import register_node_lifecycle_t
 from mosk_mcp.registration.tools.operations_visibility import register_operations_visibility_tools
 from mosk_mcp.registration.tools.template_generation import register_template_generation_tools
 from mosk_mcp.registration.tools.troubleshooting import register_troubleshooting_tools
+from mosk_mcp.registration.tools.kubectl import register_kubectl_tools
 from mosk_mcp.registration.tools.validation import register_validation_tools
 
 
@@ -38,4 +40,5 @@ __all__ = [
     "register_template_generation_tools",
     "register_troubleshooting_tools",
     "register_validation_tools",
+    "register_kubectl_tools",
 ]
