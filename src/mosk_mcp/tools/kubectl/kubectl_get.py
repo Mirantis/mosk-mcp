@@ -4,6 +4,11 @@ Mimics ``kubectl get`` using kr8s API discovery and the connected
 adapter's API client.
 
 Safety Level: READ_ONLY
+
+Secret payload values (``data`` / ``stringData``) are redacted unless the
+requested cluster's safety tier is ``development`` (``environment`` in
+``clusters.yaml`` for that cluster id, or ``MCP_ENVIRONMENT`` when that
+cluster is not configured).
 """
 
 from __future__ import annotations
@@ -13,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 import kr8s
 
 from mosk_mcp.auth.rbac import ToolSafetyLevel
+from mosk_mcp.cluster.config import ClusterEnvironment
 from mosk_mcp.core.exceptions import KubernetesError, ResourceNotFoundError, ValidationError
 from mosk_mcp.core.validation import (
     validate_kubernetes_name,
@@ -33,6 +39,8 @@ logger = get_logger(__name__)
 
 TOOL_NAME = "kubectl_get"
 TOOL_SAFETY_LEVEL = ToolSafetyLevel.READ_ONLY
+SECRET_KIND = "Secret"
+SECRET_VALUE_REDACTED = "<redacted>"
 TOOL_DESCRIPTION = (
     "Get Kubernetes resources, mimicking kubectl get. "
     "Supports resource types in TYPE[.VERSION][.GROUP] format, "
@@ -40,8 +48,81 @@ TOOL_DESCRIPTION = (
     "The jq_filter parameter uses jq syntax (not kubectl jsonpath), "
     "e.g. '.items[].metadata.name'. "
     "The cluster parameter is the Kubernetes Cluster CR name "
-    "(e.g. workload cluster 'mos' or management cluster 'kaas-mgmt')."
+    "(e.g. workload cluster 'mos' or management cluster 'kaas-mgmt'). "
+    "Secret values are redacted unless the requested cluster's "
+    "safety tier is 'development'."
 )
+
+
+async def _resolve_safety_tier(cluster: str) -> str:
+    """Resolve the safety tier for the cluster named in the request.
+
+    Looks up ``cluster`` in ``clusters.yaml`` and returns its
+    ``environment``. Falls back to the process ``MCP_ENVIRONMENT`` when
+    that cluster id is not configured.
+    """
+    try:
+        from mosk_mcp.cluster.manager import get_cluster_manager
+
+        config = await get_cluster_manager().get_config()
+        cluster_config = config.clusters.get(cluster)
+        if cluster_config is not None:
+            return cluster_config.environment.value
+    except Exception as e:
+        logger.debug(
+            "safety_tier_cluster_config_unavailable",
+            cluster=cluster,
+            error=str(e),
+            error_type=type(e).__name__,
+        )
+
+    from mosk_mcp.core.config import get_settings
+
+    return get_settings().environment.value
+
+
+def _redact_secret_payload(secret: dict[str, Any]) -> None:
+    """Replace Secret ``data`` / ``stringData`` values in place."""
+    for field in ("data", "stringData"):
+        values = secret.get(field)
+        if isinstance(values, dict):
+            secret[field] = {key: SECRET_VALUE_REDACTED for key in values}
+
+
+async def _redact_secret_contents_if_needed(
+    data: Any,
+    kind: str,
+    cluster: str,
+) -> Any:
+    """Hide Secret values outside the development safety tier.
+
+    Metadata (names, keys, labels, etc.) is preserved; only payload values
+    under ``data`` and ``stringData`` are replaced. Redaction runs before
+    jq filtering so filters cannot recover the original values.
+    """
+    if kind != SECRET_KIND:
+        return data
+
+    safety_tier = await _resolve_safety_tier(cluster)
+    if safety_tier == ClusterEnvironment.DEVELOPMENT.value:
+        return data
+
+    logger.info(
+        "kubectl_get_secret_contents_redacted",
+        cluster=cluster,
+        safety_tier=safety_tier,
+    )
+
+    if isinstance(data, dict) and isinstance(data.get("items"), list):
+        for item in data["items"]:
+            if isinstance(item, dict):
+                _redact_secret_payload(item)
+        return data
+
+    if isinstance(data, dict):
+        _redact_secret_payload(data)
+
+    return data
 
 
 def _count_resources(data: Any) -> int:
@@ -181,6 +262,9 @@ async def kubectl_get(
         namespace=input_data.namespace,
         label_selector=input_data.label_selector,
     )
+
+    # Redact before jq so filters cannot extract secret values.
+    data = await _redact_secret_contents_if_needed(data, kind, input_data.cluster)
 
     if jq_program is not None:
         data = apply_jq_program(data, jq_program)

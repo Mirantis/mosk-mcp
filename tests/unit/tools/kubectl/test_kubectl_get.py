@@ -256,3 +256,237 @@ class TestKubectlGetJqFilter:
 
         mock_get.assert_not_called()
         mock_adapter.api.lookup_kind.assert_not_called()
+
+
+class TestKubectlGetSecretSafetyTier:
+    """Secret payload values are redacted outside the development safety tier."""
+
+    @pytest.mark.asyncio
+    @patch("mosk_mcp.tools.kubectl.kubectl_get.kr8s.asyncio.get")
+    @patch("mosk_mcp.tools.kubectl.kubectl_get._resolve_safety_tier", new_callable=AsyncMock)
+    async def test_secret_values_visible_on_development(
+        self,
+        mock_tier: AsyncMock,
+        mock_get: MagicMock,
+        mock_adapter: MagicMock,
+    ) -> None:
+        mock_tier.return_value = "development"
+        mock_adapter.api.lookup_kind.return_value = ("Secret", "secrets", True)
+        mock_get.return_value = _async_gen(
+            [
+                _make_kr8s_object(
+                    {
+                        "apiVersion": "v1",
+                        "kind": "Secret",
+                        "metadata": {"name": "my-secret", "namespace": "default"},
+                        "data": {"password": "c2VjcmV0"},
+                        "stringData": {"token": "plain-token"},
+                    }
+                ),
+            ]
+        )
+
+        input_data = KubectlGetInput(
+            cluster="mos",
+            resource_type="secrets",
+            namespace="default",
+            name="my-secret",
+        )
+        result = await kubectl_get(mock_adapter, input_data)
+
+        mock_tier.assert_awaited_once_with("mos")
+        assert result.data["data"]["password"] == "c2VjcmV0"
+        assert result.data["stringData"]["token"] == "plain-token"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tier", ["staging", "production"])
+    @patch("mosk_mcp.tools.kubectl.kubectl_get.kr8s.asyncio.get")
+    @patch("mosk_mcp.tools.kubectl.kubectl_get._resolve_safety_tier", new_callable=AsyncMock)
+    async def test_secret_values_redacted_outside_development(
+        self,
+        mock_tier: AsyncMock,
+        mock_get: MagicMock,
+        mock_adapter: MagicMock,
+        tier: str,
+    ) -> None:
+        from mosk_mcp.tools.kubectl.kubectl_get import SECRET_VALUE_REDACTED
+
+        mock_tier.return_value = tier
+        mock_adapter.api.lookup_kind.return_value = ("Secret", "secrets", True)
+        mock_get.return_value = _async_gen(
+            [
+                _make_kr8s_object(
+                    {
+                        "apiVersion": "v1",
+                        "kind": "Secret",
+                        "metadata": {"name": "my-secret", "namespace": "default"},
+                        "data": {"password": "c2VjcmV0"},
+                        "stringData": {"token": "plain-token"},
+                    }
+                ),
+            ]
+        )
+
+        input_data = KubectlGetInput(
+            cluster="mos",
+            resource_type="secrets",
+            namespace="default",
+            name="my-secret",
+        )
+        result = await kubectl_get(mock_adapter, input_data)
+
+        mock_get.assert_called_once()
+        mock_tier.assert_awaited_once_with("mos")
+        assert result.data["metadata"]["name"] == "my-secret"
+        assert result.data["data"] == {"password": SECRET_VALUE_REDACTED}
+        assert result.data["stringData"] == {"token": SECRET_VALUE_REDACTED}
+
+    @pytest.mark.asyncio
+    @patch("mosk_mcp.tools.kubectl.kubectl_get.kr8s.asyncio.get")
+    @patch("mosk_mcp.tools.kubectl.kubectl_get._resolve_safety_tier", new_callable=AsyncMock)
+    async def test_secret_list_values_redacted(
+        self,
+        mock_tier: AsyncMock,
+        mock_get: MagicMock,
+        mock_adapter: MagicMock,
+    ) -> None:
+        from mosk_mcp.tools.kubectl.kubectl_get import SECRET_VALUE_REDACTED
+
+        mock_tier.return_value = "production"
+        mock_adapter.api.lookup_kind.return_value = ("Secret", "secrets", True)
+        mock_get.return_value = _async_gen(
+            [
+                _make_kr8s_object(
+                    {
+                        "apiVersion": "v1",
+                        "kind": "Secret",
+                        "metadata": {"name": "secret-a"},
+                        "data": {"key": "dmFsdWUtYQ=="},
+                    }
+                ),
+                _make_kr8s_object(
+                    {
+                        "apiVersion": "v1",
+                        "kind": "Secret",
+                        "metadata": {"name": "secret-b"},
+                        "data": {"key": "dmFsdWUtYg=="},
+                    }
+                ),
+            ]
+        )
+
+        input_data = KubectlGetInput(cluster="mos", resource_type="secrets")
+        result = await kubectl_get(mock_adapter, input_data)
+
+        assert result.count == 2
+        assert result.data["items"][0]["data"] == {"key": SECRET_VALUE_REDACTED}
+        assert result.data["items"][1]["data"] == {"key": SECRET_VALUE_REDACTED}
+
+    @pytest.mark.asyncio
+    @patch("mosk_mcp.tools.kubectl.kubectl_get.kr8s.asyncio.get")
+    @patch("mosk_mcp.tools.kubectl.kubectl_get._resolve_safety_tier", new_callable=AsyncMock)
+    async def test_redaction_happens_before_jq_filter(
+        self,
+        mock_tier: AsyncMock,
+        mock_get: MagicMock,
+        mock_adapter: MagicMock,
+    ) -> None:
+        from mosk_mcp.tools.kubectl.kubectl_get import SECRET_VALUE_REDACTED
+
+        mock_tier.return_value = "staging"
+        mock_adapter.api.lookup_kind.return_value = ("Secret", "secrets", True)
+        mock_get.return_value = _async_gen(
+            [
+                _make_kr8s_object(
+                    {
+                        "apiVersion": "v1",
+                        "kind": "Secret",
+                        "metadata": {"name": "my-secret", "namespace": "default"},
+                        "data": {"password": "c2VjcmV0"},
+                    }
+                ),
+            ]
+        )
+
+        input_data = KubectlGetInput(
+            cluster="mos",
+            resource_type="secrets",
+            namespace="default",
+            name="my-secret",
+            jq_filter=".data.password",
+        )
+        result = await kubectl_get(mock_adapter, input_data)
+
+        assert result.data == SECRET_VALUE_REDACTED
+
+    @pytest.mark.asyncio
+    @patch("mosk_mcp.tools.kubectl.kubectl_get.kr8s.asyncio.get")
+    @patch("mosk_mcp.tools.kubectl.kubectl_get._resolve_safety_tier", new_callable=AsyncMock)
+    async def test_non_secret_skips_tier_check(
+        self,
+        mock_tier: AsyncMock,
+        mock_get: MagicMock,
+        mock_adapter: MagicMock,
+    ) -> None:
+        mock_get.return_value = _async_gen(
+            [
+                _make_kr8s_object(
+                    {"apiVersion": "v1", "kind": "Pod", "metadata": {"name": "pod-1"}}
+                ),
+            ]
+        )
+
+        input_data = KubectlGetInput(cluster="mos", resource_type="pods")
+        result = await kubectl_get(mock_adapter, input_data)
+
+        mock_tier.assert_not_awaited()
+        assert result.count == 1
+
+
+class TestResolveSafetyTier:
+    """Tests for safety tier resolution used by Secret redaction."""
+
+    @pytest.mark.asyncio
+    async def test_uses_requested_cluster_environment(self) -> None:
+        from mosk_mcp.cluster.config import ClusterEnvironment
+        from mosk_mcp.tools.kubectl.kubectl_get import _resolve_safety_tier
+
+        lab = MagicMock()
+        lab.environment = ClusterEnvironment.DEVELOPMENT
+        prod = MagicMock()
+        prod.environment = ClusterEnvironment.PRODUCTION
+        config = MagicMock()
+        config.clusters = {"lab": lab, "production-us": prod}
+        manager = MagicMock()
+        manager.get_config = AsyncMock(return_value=config)
+
+        with patch(
+            "mosk_mcp.cluster.manager.get_cluster_manager",
+            return_value=manager,
+        ):
+            assert await _resolve_safety_tier("production-us") == "production"
+            assert await _resolve_safety_tier("lab") == "development"
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_settings_when_cluster_unknown(self) -> None:
+        from mosk_mcp.core.config import Environment
+        from mosk_mcp.tools.kubectl.kubectl_get import _resolve_safety_tier
+
+        settings = MagicMock()
+        settings.environment = Environment.PRODUCTION
+        config = MagicMock()
+        config.clusters = {}
+        manager = MagicMock()
+        manager.get_config = AsyncMock(return_value=config)
+
+        with (
+            patch(
+                "mosk_mcp.cluster.manager.get_cluster_manager",
+                return_value=manager,
+            ),
+            patch(
+                "mosk_mcp.core.config.get_settings",
+                return_value=settings,
+            ),
+        ):
+            assert await _resolve_safety_tier("mos") == "production"

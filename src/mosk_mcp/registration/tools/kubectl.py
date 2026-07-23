@@ -59,7 +59,9 @@ def register_kubectl_tools(
             "(e.g. 'pods', 'deployments.apps', 'machines.cluster.k8s.io'), "
             "optional namespace scoping, label selectors, and jq field filtering. "
             "jq_filter uses jq syntax (not kubectl jsonpath), e.g. '.items[].metadata.name'. "
-            "Short resource names rely on kr8s API discovery (requires api-resources RBAC)."
+            "Short resource names rely on kr8s API discovery (requires api-resources RBAC). "
+            "Secret values are redacted unless the requested cluster's "
+            "safety tier is 'development'."
         ),
     )
     async def _kubectl_get(
