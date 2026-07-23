@@ -14,3 +14,10 @@ The following issues remain; fixing them is separate work.
 - [ ] **Consolidate or remove `device_flow_client_id`** — [`src/mosk_mcp/core/config.py`](src/mosk_mcp/core/config.py) defines `device_flow_client_id` (default `"kaas"`) but it is never referenced anywhere in the codebase.
 - [ ] **Document MOSK vs management cluster clients** — MOSK cluster auth always uses hardcoded `"k8s"`; `oidc_client_id` only applies to the management cluster (`kaas`) side.
 - [ ] **Clarify effective default** — auto-discovery fallback is `"kaas"` in `discover_mcc_endpoints()`; device flow always uses `"kaas"` regardless of `oidc_client_id` or discovery.
+
+## Tool registration / packaging
+
+- [ ] **Re-organize tool groups into dedicated FastMCP local providers** — Move each tool group onto its own FastMCP `LocalProvider`, and simplify registration logic in [`src/mosk_mcp/core/server.py`](src/mosk_mcp/core/server.py) / [`src/mosk_mcp/registration/tool_groups.py`](src/mosk_mcp/registration/tool_groups.py).
+- [ ] **Converge the `registration` package into `tools`** — Fold [`src/mosk_mcp/registration/`](src/mosk_mcp/registration/) into [`src/mosk_mcp/tools/`](src/mosk_mcp/tools/) so tool implementations and MCP wiring live in one place.
+- [ ] **Add a dedicated start-up logging message for each tool group** — Emit one structured log per group (registered tools or disabled) instead of only the aggregate `tool_groups_configured` summary.
+

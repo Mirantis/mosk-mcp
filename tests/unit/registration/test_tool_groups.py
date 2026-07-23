@@ -6,6 +6,7 @@ from mosk_mcp.core.config import Settings
 from mosk_mcp.registration.tool_groups import (
     ALL_TOOL_GROUPS,
     ToolGroup,
+    registered_tool_names,
     resolve_tool_groups,
     tool_group_registration_summary,
 )
@@ -35,6 +36,10 @@ class TestResolveToolGroups:
         with pytest.raises(ValueError, match="auth"):
             resolve_tool_groups("auth")
 
+    def test_mcp_server_tools_is_unknown_group(self) -> None:
+        with pytest.raises(ValueError, match="mcp_server_tools"):
+            resolve_tool_groups("mcp_server_tools")
+
     def test_long_alias_rejected(self) -> None:
         with pytest.raises(ValueError, match="template_generation"):
             resolve_tool_groups("template_generation")
@@ -54,6 +59,25 @@ class TestToolGroupRegistrationSummary:
         assert summary["enabled_groups"] == ["ceph", "templates"]
         assert "rabbitmq" in summary["disabled_groups"]
         assert len(summary["disabled_groups"]) == 6
+
+
+class TestRegisteredToolNames:
+    """Tests for registered_tool_names helper."""
+
+    def test_lists_locally_registered_tools(self) -> None:
+        from fastmcp import FastMCP
+
+        mcp = FastMCP("test")
+
+        @mcp.tool(name="alpha")
+        def alpha() -> str:
+            return "a"
+
+        @mcp.tool(name="beta")
+        def beta() -> str:
+            return "b"
+
+        assert registered_tool_names(mcp) == ["alpha", "beta"]
 
 
 class TestSettingsToolsValidation:

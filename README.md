@@ -289,8 +289,8 @@ Test and validate cluster functionality.
 | `run_post_upgrade_validation` | Post-OpenStack upgrade validation |
 | `run_mosk_platform_validation` | Post-MOSK upgrade validation |
 
-### Utility (3 tools)
-Server health and diagnostics.
+### Utility / mcp_server_tools (3 tools)
+Server health and diagnostics (always-on).
 
 | Tool | Description |
 |------|-------------|
@@ -397,7 +397,7 @@ All settings from `src/mosk_mcp/core/config.py` can be configured via environmen
 
 #### Tool groups
 
-`MCP_TOOLS` controls which **optional** tool groups are registered by the MCP server. Auth tools, cluster management tools, and core utilities (`health_check`, `server_info`, `echo`) are always registered and are not part of this setting.
+`MCP_TOOLS` controls which **optional** tool groups are registered by the MCP server. Always-on groups (MCP server tools, auth, and cluster management) are always registered and are not part of this setting.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -426,7 +426,7 @@ MCP_TOOLS=templates,ceph mosk-mcp
 MCP_TOOLS=troubleshooting,validation mosk-mcp
 ```
 
-Invalid group names cause startup to fail with a validation error listing valid ids. At startup the server logs enabled and disabled groups (`tool_groups_configured` at INFO level). The `server_info` tool reports enabled optional groups in its `capabilities` field.
+Invalid group names cause startup to fail with a validation error listing valid ids. At startup the server logs enabled and disabled groups plus registered tool names (`tool_groups_configured` at INFO level). The `server_info` tool reports enabled optional groups in its `capabilities` field.
 
 #### Logging and audit
 

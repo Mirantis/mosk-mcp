@@ -1,6 +1,7 @@
 """Tool registration modules for MOSK MCP Server.
 
 This package contains tool registration functions organized by category:
+- mcp_server_tools: Always-on server utilities (health_check, server_info, echo)
 - auth: Authentication tools (login, logout, session_status)
 - cluster: Cluster management tools (list, switch, add, lock)
 - template_generation: CR template generation tools
@@ -20,6 +21,7 @@ from mosk_mcp.registration.tools.auth import register_auth_tools
 from mosk_mcp.registration.tools.ceph_operations import register_ceph_operations_tools
 from mosk_mcp.registration.tools.cluster import register_cluster_tools
 from mosk_mcp.registration.tools.cluster_health import register_cluster_health_tools
+from mosk_mcp.registration.tools.mcp_server_tools import register_mcp_server_tools
 from mosk_mcp.registration.tools.messaging_operations import register_messaging_operations_tools
 from mosk_mcp.registration.tools.node_lifecycle import register_node_lifecycle_tools
 from mosk_mcp.registration.tools.operations_visibility import register_operations_visibility_tools
@@ -34,6 +36,7 @@ __all__ = [
     "register_ceph_operations_tools",
     "register_cluster_health_tools",
     "register_cluster_tools",
+    "register_mcp_server_tools",
     "register_messaging_operations_tools",
     "register_node_lifecycle_tools",
     "register_operations_visibility_tools",
