@@ -4,7 +4,7 @@
 
 An MCP (Model Context Protocol) server that enables AI assistants like Claude to manage Mirantis OpenStack for Kubernetes (MOSK) clusters through natural conversation. Query cluster health, troubleshoot issues, generate infrastructure templates, and perform operations - all by simply asking.
 
-**Version:** 0.1.0 | **Tools:** 81 | **Categories:** 11
+**Version:** 0.1.0 | **Tools:** 82 | **Categories:** 12
 
 ---
 
@@ -19,6 +19,7 @@ An MCP (Model Context Protocol) server that enables AI assistants like Claude to
 | **Operations Visibility** | Monitor upgrades, track migrations, view rollout status |
 | **Alerts & Observability** | List active alerts, explain them, get remediation suggestions |
 | **Validation & Testing** | Run smoke tests, validate post-upgrade, check service availability |
+| **Kubectl-Compatible Access** | Query Kubernetes resources with kubectl-style get (workload or management cluster) |
 
 ---
 
@@ -149,7 +150,7 @@ claude mcp add mosk-mcp \
 
 ---
 
-## Supported Tools (81 Total)
+## Supported Tools (82 Total)
 
 ### Authentication (5 tools)
 Secure OAuth 2.0 Device Flow authentication - no passwords in chat.
@@ -172,6 +173,13 @@ Interact with multiple management clusters safely.
 | `switch_cluster` | Switch clusters (clears session for safety) |
 | `add_cluster` | Add new cluster configuration |
 | `lock_cluster` | Prevent accidental cluster switches |
+
+### Kubectl (1 tool)
+Generic Kubernetes resource access mimicking kubectl (always-on).
+
+| Tool | Description |
+|------|-------------|
+| `kubectl_get` | Get resources (`TYPE[.VERSION][.GROUP]`), with namespace, labels, and jsonpath |
 
 ### Template Generation (7 tools)
 Generate infrastructure-as-code templates without applying them.
@@ -397,7 +405,7 @@ All settings from `src/mosk_mcp/core/config.py` can be configured via environmen
 
 #### Tool groups
 
-`MCP_TOOLS` controls which **optional** tool groups are registered by the MCP server. Always-on groups (MCP server tools, auth, and cluster management) are always registered and are not part of this setting.
+`MCP_TOOLS` controls which **optional** tool groups are registered by the MCP server. Always-on groups (MCP server tools, auth, cluster management, and kubectl) are always registered and are not part of this setting.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
