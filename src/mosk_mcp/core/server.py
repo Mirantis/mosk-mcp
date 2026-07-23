@@ -13,12 +13,9 @@ from __future__ import annotations
 
 import contextlib
 import sys
-import uuid
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from fastmcp import FastMCP
-from pydantic import Field
 
 from mosk_mcp.core.config import Settings, TransportType, get_settings, init_settings
 from mosk_mcp.core.exceptions import (
@@ -29,18 +26,18 @@ from mosk_mcp.core.exceptions import (
     ValidationError,
 )
 from mosk_mcp.core.server_context import ServerContextConfig, SSOServerContext
-from mosk_mcp.infrastructure.version_checker import get_cached_version_info
-from mosk_mcp.observability.logging import LoggingContext, get_logger, setup_logging
+from mosk_mcp.observability.logging import get_logger, setup_logging
 from mosk_mcp.observability.tool_logging_middleware import create_tool_logging_middleware
 from mosk_mcp.privacy.middleware import create_privacy_middleware
-from mosk_mcp.registration.models import ServerHealthResult, ServerInfo
 from mosk_mcp.registration.tools import (
     register_auth_tools,
     register_cluster_tools,
+    register_mcp_server_tools,
 )
 from mosk_mcp.registration.tool_groups import (
     ToolGroup,
     register_tool_groups,
+    registered_tool_names,
     resolve_tool_groups,
     tool_group_registration_summary,
 )
@@ -203,7 +200,7 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
             enabled=settings.privacy_enabled,
         )
 
-    # FastMCP 3.x: list_tools() is async; tool count is not available in sync context
+    # FastMCP 3.x: list_tools() is async; sync tool names come from local_provider
     logger.info("server_initialized")
 
     return mcp
@@ -225,121 +222,19 @@ def _register_tools(
     """
     enabled_group_ids = sorted(g.value for g in enabled_tool_groups)
 
-    # Health check tool - always available
-    @mcp.tool(
-        name="health_check",
-        description="Check the health of the MOSK MCP server and its connections",
-    )
-    async def health_check() -> ServerHealthResult:
-        """Perform a health check of the server.
-
-        Returns:
-            ServerHealthResult with status and component checks.
-        """
-        request_id = str(uuid.uuid4())
-
-        async with LoggingContext(request_id=request_id, tool_name="health_check"):
-            logger.debug("health_check_started")
-
-            checks: dict[str, dict] = {}
-
-            # Check basic functionality
-            checks["server"] = {"status": "healthy", "message": "Server is running"}
-
-            # Check configuration
-            checks["config"] = {
-                "status": "healthy",
-                "auth_enabled": settings.auth_enabled,
-                "transport": settings.transport.value,
-            }
-
-            # Determine overall status
-            all_healthy = all(
-                c.get("status") == "healthy" for c in checks.values() if isinstance(c, dict)
-            )
-            status = "healthy" if all_healthy else "degraded"
-
-            result = ServerHealthResult(
-                status=status,
-                timestamp=datetime.now(UTC).isoformat(),
-                version=settings.app_version,
-                checks=checks,
-            )
-
-            logger.info("health_check_completed", status=status)
-
-            return result
-
-    # Server info tool
-    @mcp.tool(
-        name="server_info",
-        description="Get information about the MOSK MCP server and its capabilities",
-    )
-    async def server_info() -> ServerInfo:
-        """Get server information and capabilities.
-
-        Returns:
-            ServerInfo with server details and available capabilities.
-        """
-        request_id = str(uuid.uuid4())
-
-        async with LoggingContext(request_id=request_id, tool_name="server_info"):
-            logger.debug("server_info_requested")
-
-            capabilities = enabled_group_ids
-
-            # Get MOSK version info if available (populated after login)
-            version_info = get_cached_version_info()
-            mosk_version = version_info.version_string if version_info else None
-            mosk_version_supported = version_info.is_compatible if version_info else None
-            warnings = version_info.warnings if version_info else []
-
-            info = ServerInfo(
-                name=settings.app_name,
-                version=settings.app_version,
-                transport=settings.transport.value,
-                auth_enabled=settings.auth_enabled,
-                capabilities=capabilities,
-                mosk_version=mosk_version,
-                mosk_version_supported=mosk_version_supported,
-                warnings=warnings,
-            )
-
-            logger.debug("server_info_returned", mosk_version=mosk_version)
-            return info
-
-    # Echo tool for testing
-    @mcp.tool(
-        name="echo",
-        description="Echo back a message - useful for testing connectivity",
-    )
-    async def echo(message: str = Field(..., description="Message to echo back")) -> str:
-        """Echo back a message for testing.
-
-        Args:
-            message: The message to echo back.
-
-        Returns:
-            The same message with a prefix.
-        """
-        request_id = str(uuid.uuid4())
-
-        async with LoggingContext(request_id=request_id, tool_name="echo"):
-            logger.debug("echo_received", message_length=len(message))
-            return f"[MOSK MCP] {message}"
-
-    # =========================================================================
-    # Authentication Tools (SSO Login/Logout/Status)
-    # =========================================================================
-
+    # Always-on groups (not controlled by MCP_TOOLS)
+    register_mcp_server_tools(mcp, settings, enabled_group_ids)
     register_auth_tools(mcp, settings, context_getter)
     register_cluster_tools(mcp, settings, context_getter)
 
     register_tool_groups(mcp, settings, context_getter, enabled_tool_groups)
 
+    tools = registered_tool_names(mcp)
     logger.info(
         "tool_groups_configured",
         **tool_group_registration_summary(enabled_tool_groups),
+        tools=tools,
+        tool_count=len(tools),
     )
 
 

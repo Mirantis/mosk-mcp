@@ -12,6 +12,7 @@ This package provides the registration layer that connects tools to the FastMCP 
 Usage:
     from mosk_mcp.registration.models import ServerHealthResult, ServerInfo
     from mosk_mcp.registration.tools import (
+        register_mcp_server_tools,
         register_auth_tools,
         register_template_generation_tools,
         register_ceph_operations_tools,

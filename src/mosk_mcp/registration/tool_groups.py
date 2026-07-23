@@ -1,7 +1,7 @@
 """Optional MCP tool group configuration and registration.
 
-Auth and cluster tools are registered unconditionally in the server; this module
-covers the eight optional groups controlled by ``MCP_TOOLS``.
+Auth, cluster, and mcp_server_tools are registered unconditionally in the
+server; this module covers the eight optional groups controlled by ``MCP_TOOLS``.
 """
 
 from __future__ import annotations
@@ -88,6 +88,17 @@ def tool_group_registration_summary(
         "enabled_groups": sorted(g.value for g in enabled),
         "disabled_groups": disabled,
     }
+
+
+def registered_tool_names(mcp: FastMCP) -> list[str]:
+    """Return sorted names of tools registered on the server's local provider."""
+    from fastmcp.tools import Tool
+
+    return sorted(
+        component.name
+        for component in mcp.local_provider._components.values()
+        if isinstance(component, Tool)
+    )
 
 
 def register_tool_groups(
