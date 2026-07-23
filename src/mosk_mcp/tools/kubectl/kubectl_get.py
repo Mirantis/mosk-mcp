@@ -178,9 +178,9 @@ async def kubectl_get(
 
     count = _count_resources(data)
 
-    return KubectlGetOutput(
+return KubectlGetOutput(
         cluster=input_data.cluster,
-        resource_type=input_data.resource_type,
+        resource_type=resource_type,
         namespace=input_data.namespace,
         name=input_data.name,
         kind=kind,
