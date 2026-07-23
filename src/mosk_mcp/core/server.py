@@ -32,11 +32,8 @@ from mosk_mcp.privacy.middleware import create_privacy_middleware
 from mosk_mcp.registration.tools import (
     register_auth_tools,
     register_cluster_tools,
-<<<<<<< HEAD
     register_kubectl_tools,
-=======
     register_mcp_server_tools,
->>>>>>> main
 )
 from mosk_mcp.registration.tool_groups import (
     ToolGroup,
@@ -234,123 +231,17 @@ def _register_tools(
     register_mcp_server_tools(mcp, settings, enabled_group_ids)
     register_auth_tools(mcp, settings, context_getter)
     register_cluster_tools(mcp, settings, context_getter)
+    register_kubectl_tools(mcp, settings, context_getter)
 
     # Optional groups controlled by MCP_TOOLS (templates, ceph, rabbitmq, etc.)
     register_tool_groups(mcp, settings, context_getter, enabled_tool_groups)
 
-<<<<<<< HEAD
-    # =========================================================================
-    # Kubectl-Compatible Tools (READ_ONLY)
-    # =========================================================================
-
-    register_kubectl_tools(mcp, settings, context_getter)
-
-    logger.debug(
-        "tools_registered",
-        tools=[
-            # Core/Utility tools (3)
-            "health_check",
-            "server_info",
-            "echo",
-            # Authentication tools (5)
-            "login_secure",
-            "login_start",
-            "login_complete",
-            "logout",
-            "session_status",
-            # Cluster management tools (5)
-            "list_clusters",
-            "current_cluster",
-            "switch_cluster",
-            "add_cluster",
-            "lock_cluster",
-            # Template generation tools (7)
-            "generate_bmhi",
-            "generate_bmhp",
-            "generate_machine",
-            "generate_node_templates",
-            "generate_l2template",
-            "generate_osdpl_patch",
-            "validate_template",
-            # Ceph operations tools (7)
-            "get_ceph_status",
-            "list_osds",
-            "get_osd_details",
-            "get_ceph_capacity",
-            "get_pg_status",
-            "predict_capacity",
-            "get_recovery_status",
-            # RabbitMQ messaging operations tools (4)
-            "get_rabbitmq_status",
-            "list_rabbitmq_queues",
-            "get_rabbitmq_connections",
-            "diagnose_rabbitmq_issue",
-            # Node lifecycle tools (11)
-            "list_machines",
-            "get_machine_details",
-            "list_bmh",
-            "list_bmhp",
-            "list_l2templates",
-            "get_node_readiness",
-            "get_migration_status",
-            "get_node_provision_progress",
-            "get_ipamhost_details",
-            "create_maintenance_request",
-            "apply_machine",
-            # Operations visibility tools (16)
-            "list_osdpl",
-            "get_openstack_deployment_status",
-            "get_openstack_upgrade_progress",
-            "get_mosk_platform_status",
-            "get_mosk_platform_upgrade_progress",
-            "list_available_releases",
-            "monitor_operation",
-            "get_component_versions",
-            "list_live_migrations",
-            "get_migration_eta",
-            "list_maintenance_requests",
-            "get_rollout_status",
-            "get_node_conditions",
-            "apply_osdpl_patch",
-            "apply_cluster_release_patch",
-            "commence_cluster_upgrade",
-            # Cluster health tools (8)
-            "get_mosk_cluster_health",
-            "get_kubernetes_health",
-            "get_openstack_health",
-            "get_ceph_health",
-            "list_active_alerts",
-            "get_alert_details",
-            "run_preflight_check",
-            "get_resource_utilization",
-            # Troubleshooting tools (11)
-            "query_logs",
-            "get_pod_logs",
-            "correlate_events",
-            "explain_alert",
-            "trace_request",
-            "diagnose_vm_failure",
-            "diagnose_network_issue",
-            "diagnose_storage_issue",
-            "get_known_issues",
-            "suggest_resolution",
-            "create_diagnostic_bundle",
-            # Validation tools (4)
-            "check_service_availability",
-            "run_smoke_test",
-            "run_post_upgrade_validation",
-            "run_mosk_platform_validation",
-            # Kubectl tools (1)
-            "kubectl_get",
-        ],
-=======
     tools = registered_tool_names(mcp)
     logger.info(
         "tool_groups_configured",
         **tool_group_registration_summary(enabled_tool_groups),
         tools=tools,
         tool_count=len(tools),
->>>>>>> main
     )
 
 
