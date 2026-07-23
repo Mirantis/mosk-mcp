@@ -1,7 +1,7 @@
 """Optional MCP tool group configuration and registration.
 
-Auth and cluster tools are registered unconditionally in the server; this module
-covers the eight optional groups controlled by ``MCP_TOOLS``.
+Auth, cluster, and mcp_server_tools are registered unconditionally in the
+server; this module covers the eight optional groups controlled by ``MCP_TOOLS``.
 """
 
 from __future__ import annotations

@@ -35,6 +35,10 @@ class TestResolveToolGroups:
         with pytest.raises(ValueError, match="auth"):
             resolve_tool_groups("auth")
 
+    def test_mcp_server_tools_is_unknown_group(self) -> None:
+        with pytest.raises(ValueError, match="mcp_server_tools"):
+            resolve_tool_groups("mcp_server_tools")
+
     def test_long_alias_rejected(self) -> None:
         with pytest.raises(ValueError, match="template_generation"):
             resolve_tool_groups("template_generation")

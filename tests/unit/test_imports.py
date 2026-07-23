@@ -217,6 +217,7 @@ class TestRegistrationImports:
             register_auth_tools,
             register_ceph_operations_tools,
             register_cluster_health_tools,
+            register_mcp_server_tools,
             register_node_lifecycle_tools,
             register_operations_visibility_tools,
             register_template_generation_tools,
@@ -227,6 +228,7 @@ class TestRegistrationImports:
         assert callable(register_auth_tools)
         assert callable(register_ceph_operations_tools)
         assert callable(register_cluster_health_tools)
+        assert callable(register_mcp_server_tools)
         assert callable(register_node_lifecycle_tools)
         assert callable(register_operations_visibility_tools)
         assert callable(register_template_generation_tools)
