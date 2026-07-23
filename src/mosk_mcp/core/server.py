@@ -37,6 +37,7 @@ from mosk_mcp.registration.tools import (
 from mosk_mcp.registration.tool_groups import (
     ToolGroup,
     register_tool_groups,
+    registered_tool_names,
     resolve_tool_groups,
     tool_group_registration_summary,
 )
@@ -199,7 +200,7 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
             enabled=settings.privacy_enabled,
         )
 
-    # FastMCP 3.x: list_tools() is async; tool count is not available in sync context
+    # FastMCP 3.x: list_tools() is async; sync tool names come from local_provider
     logger.info("server_initialized")
 
     return mcp
@@ -228,9 +229,12 @@ def _register_tools(
 
     register_tool_groups(mcp, settings, context_getter, enabled_tool_groups)
 
+    tools = registered_tool_names(mcp)
     logger.info(
         "tool_groups_configured",
         **tool_group_registration_summary(enabled_tool_groups),
+        tools=tools,
+        tool_count=len(tools),
     )
 
 

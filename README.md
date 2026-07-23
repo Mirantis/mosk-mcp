@@ -426,7 +426,7 @@ MCP_TOOLS=templates,ceph mosk-mcp
 MCP_TOOLS=troubleshooting,validation mosk-mcp
 ```
 
-Invalid group names cause startup to fail with a validation error listing valid ids. At startup the server logs enabled and disabled groups (`tool_groups_configured` at INFO level). The `server_info` tool reports enabled optional groups in its `capabilities` field.
+Invalid group names cause startup to fail with a validation error listing valid ids. At startup the server logs enabled and disabled groups plus registered tool names (`tool_groups_configured` at INFO level). The `server_info` tool reports enabled optional groups in its `capabilities` field.
 
 #### Logging and audit
 

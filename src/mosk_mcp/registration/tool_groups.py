@@ -90,6 +90,17 @@ def tool_group_registration_summary(
     }
 
 
+def registered_tool_names(mcp: FastMCP) -> list[str]:
+    """Return sorted names of tools registered on the server's local provider."""
+    from fastmcp.tools import Tool
+
+    return sorted(
+        component.name
+        for component in mcp.local_provider._components.values()
+        if isinstance(component, Tool)
+    )
+
+
 def register_tool_groups(
     mcp: FastMCP,
     settings: Settings,
