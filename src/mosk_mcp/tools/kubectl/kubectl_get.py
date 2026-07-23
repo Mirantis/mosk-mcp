@@ -60,10 +60,7 @@ async def _fetch_resources(
     label_selector: str | None,
 ) -> tuple[Any, str, str | None]:
     """Fetch resources via kr8s discovery and return data, kind, api_version."""
-    kind, _plural, namespaced = await kr8s.asyncio.lookup_kind(
-        resource_type,
-        api=adapter.api,
-    )
+    kind, _plural, namespaced = await adapter.api.lookup_kind(resource_type)
 
     if not namespaced:
         ns = None

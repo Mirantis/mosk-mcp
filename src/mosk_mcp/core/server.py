@@ -37,12 +37,6 @@ from mosk_mcp.registration.models import ServerHealthResult, ServerInfo
 from mosk_mcp.registration.tools import (
     register_auth_tools,
     register_cluster_tools,
-    register_messaging_operations_tools,
-    register_node_lifecycle_tools,
-    register_operations_visibility_tools,
-    register_template_generation_tools,
-    register_troubleshooting_tools,
-    register_validation_tools,
     register_kubectl_tools,
 )
 from mosk_mcp.registration.tool_groups import (
@@ -189,6 +183,10 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
     # Register tools with the shared context getter
     # We pass the get_server_context function instead of the context object itself
     enabled_tool_groups = resolve_tool_groups(settings.tools)
+    logger.info(
+        "tool_groups_configured",
+        **tool_group_registration_summary(enabled_tool_groups),
+    )
     _register_tools(mcp, settings, get_server_context, enabled_tool_groups)
 
     # Register tool execution logging middleware
@@ -342,51 +340,8 @@ def _register_tools(
     register_auth_tools(mcp, settings, context_getter)
     register_cluster_tools(mcp, settings, context_getter)
 
+    # Optional groups controlled by MCP_TOOLS (templates, ceph, rabbitmq, etc.)
     register_tool_groups(mcp, settings, context_getter, enabled_tool_groups)
-
-    register_template_generation_tools(mcp)
-
-    # =========================================================================
-    # Ceph Storage Operations Tools
-    # =========================================================================
-
-    register_ceph_operations_tools(mcp, settings, context_getter)
-
-    # =========================================================================
-    # RabbitMQ Messaging Operations Tools (READ_ONLY)
-    # =========================================================================
-
-    register_messaging_operations_tools(mcp, settings, context_getter)
-
-    # =========================================================================
-    # Node Lifecycle Management Tools
-    # =========================================================================
-
-    register_node_lifecycle_tools(mcp, settings, context_getter)
-
-    # =========================================================================
-    # Operations Visibility Tools (READ_ONLY)
-    # =========================================================================
-
-    register_operations_visibility_tools(mcp, settings, context_getter)
-
-    # =========================================================================
-    # Cluster Health Tools (READ_ONLY)
-    # =========================================================================
-
-    register_cluster_health_tools(mcp, settings, context_getter)
-
-    # =========================================================================
-    # Intelligent Troubleshooting Tools (READ_ONLY)
-    # =========================================================================
-
-    register_troubleshooting_tools(mcp, settings, context_getter)
-
-    # =========================================================================
-    # Post-Upgrade Validation Tools (READ_ONLY / functional)
-    # =========================================================================
-
-    register_validation_tools(mcp, settings, context_getter)
 
     # =========================================================================
     # Kubectl-Compatible Tools (READ_ONLY)
