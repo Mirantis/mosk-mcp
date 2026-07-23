@@ -179,7 +179,7 @@ Generic Kubernetes resource access mimicking kubectl (always-on).
 
 | Tool | Description |
 |------|-------------|
-| `kubectl_get` | Get resources (`TYPE[.VERSION][.GROUP]`), with namespace, labels, and jsonpath |
+| `kubectl_get` | Get resources (`TYPE[.VERSION][.GROUP]`), with namespace, labels, and jq filter |
 
 ### Template Generation (7 tools)
 Generate infrastructure-as-code templates without applying them.

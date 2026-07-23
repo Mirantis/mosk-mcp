@@ -57,7 +57,8 @@ def register_kubectl_tools(
             "(e.g. workload 'mos' or management 'kaas-mgmt'), not a role. "
             "Supports resource types in TYPE[.VERSION][.GROUP] format "
             "(e.g. 'pods', 'deployments.apps', 'machines.cluster.k8s.io'), "
-            "optional namespace scoping, label selectors, and jsonpath field filtering. "
+            "optional namespace scoping, label selectors, and jq field filtering. "
+            "jq_filter uses jq syntax (not kubectl jsonpath), e.g. '.items[].metadata.name'. "
             "Short resource names rely on kr8s API discovery (requires api-resources RBAC)."
         ),
     )
@@ -84,9 +85,12 @@ def register_kubectl_tools(
             default=None,
             description="Label selector (e.g. 'app=nova-api').",
         ),
-        jsonpath: str | None = Field(
+        jq_filter: str | None = Field(
             default=None,
-            description="Optional jsonpath to filter fields (e.g. '{.items[*].metadata.name}')",
+            description=(
+                "Optional jq filter expression (jq syntax, not kubectl jsonpath), "
+                "e.g. '.items[].metadata.name' or '.status.phase'"
+            ),
         ),
     ) -> dict[str, Any]:
         """Get Kubernetes resources."""
@@ -101,7 +105,7 @@ def register_kubectl_tools(
                 namespace=namespace,
                 name=name,
                 label_selector=label_selector,
-                jsonpath=jsonpath,
+                jq_filter=jq_filter,
             )
             result = await kubectl_get(adapter, input_data)
             return result.model_dump()

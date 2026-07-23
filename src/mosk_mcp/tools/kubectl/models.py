@@ -36,11 +36,12 @@ class KubectlGetInput(BaseModel):
         default=None,
         description="Kubernetes label selector (e.g. 'app=nova-api').",
     )
-    jsonpath: str | None = Field(
+    jq_filter: str | None = Field(
         default=None,
         description=(
-            "Optional kubectl-style jsonpath to filter output fields "
-            "(e.g. '{.items[*].metadata.name}'). Response is always JSON."
+            "Optional jq filter expression to select/transform output fields. "
+            "Syntax must follow jq (not kubectl jsonpath), e.g. "
+            "'.items[].metadata.name' or '.status.phase'. Response is always JSON."
         ),
     )
 
@@ -58,4 +59,4 @@ class KubectlGetOutput(BaseModel):
     kind: str | None = Field(default=None, description="Resolved Kubernetes kind")
     api_version: str | None = Field(default=None, description="Resolved API version")
     count: int = Field(default=0, description="Number of resources returned")
-    data: Any = Field(..., description="Resource data or jsonpath-filtered result")
+    data: Any = Field(..., description="Resource data or jq-filtered result")

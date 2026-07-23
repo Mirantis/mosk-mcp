@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from mosk_mcp.core.exceptions import ToolExecutionError
 from mosk_mcp.tools.kubectl.kubectl_get import kubectl_get
 from mosk_mcp.tools.kubectl.models import KubectlGetInput
 
@@ -160,12 +161,12 @@ class TestKubectlGetCrdResources:
         assert result.api_version == "cluster.k8s.io/v1alpha1"
 
 
-class TestKubectlGetJsonpath:
-    """Tests for kubectl_get jsonpath filtering."""
+class TestKubectlGetJqFilter:
+    """Tests for kubectl_get jq filtering."""
 
     @pytest.mark.asyncio
     @patch("mosk_mcp.tools.kubectl.kubectl_get.kr8s.asyncio.get")
-    async def test_jsonpath_on_list(
+    async def test_jq_filter_on_list(
         self,
         mock_get: MagicMock,
         mock_adapter: MagicMock,
@@ -180,7 +181,7 @@ class TestKubectlGetJsonpath:
         input_data = KubectlGetInput(
             cluster="mos",
             resource_type="pods",
-            jsonpath="{.items[*].metadata.name}",
+            jq_filter=".items[].metadata.name",
         )
         result = await kubectl_get(mock_adapter, input_data)
 
@@ -189,7 +190,7 @@ class TestKubectlGetJsonpath:
 
     @pytest.mark.asyncio
     @patch("mosk_mcp.tools.kubectl.kubectl_get.kr8s.asyncio.get")
-    async def test_jsonpath_on_single_resource(
+    async def test_jq_filter_on_single_resource(
         self,
         mock_get: MagicMock,
         mock_adapter: MagicMock,
@@ -209,9 +210,27 @@ class TestKubectlGetJsonpath:
             cluster="mos",
             resource_type="pods",
             name="my-pod",
-            jsonpath="{.status.phase}",
+            jq_filter=".status.phase",
         )
         result = await kubectl_get(mock_adapter, input_data)
 
         assert result.data == "Running"
         assert result.count == 1
+
+    @pytest.mark.asyncio
+    @patch("mosk_mcp.tools.kubectl.kubectl_get.kr8s.asyncio.get")
+    async def test_invalid_jq_filter_fails_before_fetch(
+        self,
+        mock_get: MagicMock,
+        mock_adapter: MagicMock,
+    ) -> None:
+        input_data = KubectlGetInput(
+            cluster="mos",
+            resource_type="pods",
+            jq_filter=".[",
+        )
+        with pytest.raises(ToolExecutionError, match="Invalid jq filter"):
+            await kubectl_get(mock_adapter, input_data)
+
+        mock_get.assert_not_called()
+        mock_adapter.api.lookup_kind.assert_not_called()

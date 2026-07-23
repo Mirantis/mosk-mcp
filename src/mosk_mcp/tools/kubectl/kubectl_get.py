@@ -21,7 +21,7 @@ from mosk_mcp.core.validation import (
 )
 from mosk_mcp.observability.logging import get_logger
 from mosk_mcp.tools.common.errors import tool_handler
-from mosk_mcp.tools.kubectl.jsonpath import apply_jsonpath
+from mosk_mcp.tools.kubectl.jq_filter import apply_jq_program, compile_jq_filter
 from mosk_mcp.tools.kubectl.models import KubectlGetInput, KubectlGetOutput
 
 
@@ -36,7 +36,9 @@ TOOL_SAFETY_LEVEL = ToolSafetyLevel.READ_ONLY
 TOOL_DESCRIPTION = (
     "Get Kubernetes resources, mimicking kubectl get. "
     "Supports resource types in TYPE[.VERSION][.GROUP] format, "
-    "namespace scoping, label selectors, and optional jsonpath filtering. "
+    "namespace scoping, label selectors, and optional jq filtering. "
+    "The jq_filter parameter uses jq syntax (not kubectl jsonpath), "
+    "e.g. '.items[].metadata.name'. "
     "The cluster parameter is the Kubernetes Cluster CR name "
     "(e.g. workload cluster 'mos' or management cluster 'kaas-mgmt')."
 )
@@ -158,6 +160,11 @@ async def kubectl_get(
             value=input_data.resource_type,
         )
 
+    # Compile jq filter before fetching so invalid expressions fail fast.
+    jq_program = None
+    if input_data.jq_filter:
+        jq_program = compile_jq_filter(input_data.jq_filter)
+
     data, kind, api_version = await _fetch_resources(
         adapter,
         resource_type,
@@ -166,8 +173,8 @@ async def kubectl_get(
         label_selector=input_data.label_selector,
     )
 
-    if input_data.jsonpath:
-        data = apply_jsonpath(data, input_data.jsonpath)
+    if jq_program is not None:
+        data = apply_jq_program(data, jq_program)
 
     count = _count_resources(data)
 
