@@ -62,7 +62,14 @@ async def _fetch_resources(
     label_selector: str | None,
 ) -> tuple[Any, str, str | None]:
     """Fetch resources via kr8s discovery and return data, kind, api_version."""
-    kind, _plural, namespaced = await adapter.api.lookup_kind(resource_type)
+kind, _plural, namespaced = await adapter.api.lookup_kind(resource_type)
+
+    if namespaced and name and namespace is None:
+        raise ValidationError(
+            "namespace is required when name is provided for namespaced resources",
+            field="namespace",
+            constraint="must be provided when name is set",
+        )
 
     if not namespaced:
         ns = None
