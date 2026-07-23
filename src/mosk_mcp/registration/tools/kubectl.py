@@ -75,11 +75,17 @@ def register_kubectl_tools(
         ),
         namespace: str | None = Field(
             default=None,
-            description="Namespace to query. Omit to search all namespaces.",
+            description=(
+                "Namespace to query. Omit to list across all namespaces. "
+                "Required when name is set for namespaced resources."
+            ),
         ),
         name: str | None = Field(
             default=None,
-            description="Optional resource name. Omit to list resources.",
+            description=(
+                "Optional resource name. Omit to list resources. "
+                "For namespaced resources, namespace must also be provided."
+            ),
         ),
         label_selector: str | None = Field(
             default=None,

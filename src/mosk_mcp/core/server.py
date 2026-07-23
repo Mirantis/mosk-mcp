@@ -238,8 +238,7 @@ def _register_tools(
 
     tools = registered_tool_names(mcp)
     logger.info(
-        "tool_groups_configured",
-        **tool_group_registration_summary(enabled_tool_groups),
+        "tools_registered",
         tools=tools,
         tool_count=len(tools),
     )

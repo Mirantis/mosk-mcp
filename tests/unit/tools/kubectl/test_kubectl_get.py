@@ -161,6 +161,27 @@ class TestKubectlGetCrdResources:
         assert result.api_version == "cluster.k8s.io/v1alpha1"
 
 
+class TestKubectlGetNamespaceRequired:
+    """Tests for namespace requirements with named gets."""
+
+    @pytest.mark.asyncio
+    @patch("mosk_mcp.tools.kubectl.kubectl_get.kr8s.asyncio.get")
+    async def test_named_namespaced_resource_requires_namespace(
+        self,
+        mock_get: MagicMock,
+        mock_adapter: MagicMock,
+    ) -> None:
+        input_data = KubectlGetInput(
+            cluster="mos",
+            resource_type="pods",
+            name="my-pod",
+        )
+        with pytest.raises(ToolExecutionError, match="namespace is required"):
+            await kubectl_get(mock_adapter, input_data)
+
+        mock_get.assert_not_called()
+
+
 class TestKubectlGetJqFilter:
     """Tests for kubectl_get jq filtering."""
 
@@ -209,6 +230,7 @@ class TestKubectlGetJqFilter:
         input_data = KubectlGetInput(
             cluster="mos",
             resource_type="pods",
+            namespace="openstack",
             name="my-pod",
             jq_filter=".status.phase",
         )

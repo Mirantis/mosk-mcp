@@ -62,8 +62,10 @@ async def _fetch_resources(
     label_selector: str | None,
 ) -> tuple[Any, str, str | None]:
     """Fetch resources via kr8s discovery and return data, kind, api_version."""
-kind, _plural, namespaced = await adapter.api.lookup_kind(resource_type)
+    kind, _plural, namespaced = await adapter.api.lookup_kind(resource_type)
 
+    # Match kubectl: named gets require an explicit namespace for namespaced kinds.
+    # ``kubectl get pod NAME -A`` is not supported; all-namespaces is for lists only.
     if namespaced and name and namespace is None:
         raise ValidationError(
             "namespace is required when name is provided for namespaced resources",
@@ -185,13 +187,13 @@ async def kubectl_get(
 
     count = _count_resources(data)
 
-return KubectlGetOutput(
-        cluster=input_data.cluster,
-        resource_type=resource_type,
-        namespace=input_data.namespace,
-        name=input_data.name,
-        kind=kind,
-        api_version=api_version,
-        count=count,
-        data=data,
-    )
+    return KubectlGetOutput(
+            cluster=input_data.cluster,
+            resource_type=resource_type,
+            namespace=input_data.namespace,
+            name=input_data.name,
+            kind=kind,
+            api_version=api_version,
+            count=count,
+            data=data,
+        )
