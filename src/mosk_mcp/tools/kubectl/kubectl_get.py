@@ -5,10 +5,8 @@ adapter's API client.
 
 Safety Level: READ_ONLY
 
-Secret payload values (``data`` / ``stringData``) are redacted unless the
-requested cluster's safety tier is ``development`` (``environment`` in
-``clusters.yaml`` for that cluster id, or ``MCP_ENVIRONMENT`` when that
-cluster is not configured).
+Secret payload values (``data`` / ``stringData`` / ``binaryData``) are
+redacted unless the cluster's safety tier is ``development``.
 """
 
 from __future__ import annotations
@@ -82,8 +80,12 @@ async def _resolve_safety_tier(cluster: str) -> str:
 
 
 def _redact_secret_payload(secret: dict[str, Any]) -> None:
-    """Replace Secret ``data`` / ``stringData`` values in place."""
-    for field in ("data", "stringData"):
+    """Replace Secret payload map values in place.
+
+    Covers ``data`` and ``stringData`` (core/v1 Secret). ``binaryData`` is
+    included defensively (ConfigMap field) if present on the object.
+    """
+    for field in ("data", "stringData", "binaryData"):
         values = secret.get(field)
         if isinstance(values, dict):
             secret[field] = {key: SECRET_VALUE_REDACTED for key in values}
@@ -97,8 +99,9 @@ async def _redact_secret_contents_if_needed(
     """Hide Secret values outside the development safety tier.
 
     Metadata (names, keys, labels, etc.) is preserved; only payload values
-    under ``data`` and ``stringData`` are replaced. Redaction runs before
-    jq filtering so filters cannot recover the original values.
+    under ``data``, ``stringData``, and ``binaryData`` are replaced.
+    Redaction runs before jq filtering so filters cannot recover the
+    original values.
     """
     if kind != SECRET_KIND:
         return data

@@ -322,6 +322,7 @@ class TestKubectlGetSecretSafetyTier:
                         "metadata": {"name": "my-secret", "namespace": "default"},
                         "data": {"password": "c2VjcmV0"},
                         "stringData": {"token": "plain-token"},
+                        "binaryData": {"blob": "YmluYXJ5"},
                     }
                 ),
             ]
@@ -340,6 +341,7 @@ class TestKubectlGetSecretSafetyTier:
         assert result.data["metadata"]["name"] == "my-secret"
         assert result.data["data"] == {"password": SECRET_VALUE_REDACTED}
         assert result.data["stringData"] == {"token": SECRET_VALUE_REDACTED}
+        assert result.data["binaryData"] == {"blob": SECRET_VALUE_REDACTED}
 
     @pytest.mark.asyncio
     @patch("mosk_mcp.tools.kubectl.kubectl_get.kr8s.asyncio.get")
