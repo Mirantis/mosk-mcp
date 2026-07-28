@@ -43,6 +43,7 @@ dependencies = [
     "PyYAML>=6.0",
     "python-json-logger>=2.0.0",
     "aiofiles>=24.0.0",
+    "jq>=1.8.0",
     # HTTP transport and observability
     "starlette>=0.37.0",
     "uvicorn>=0.29.0",
@@ -195,6 +196,7 @@ warn_required_dynamic_aliases = true
 module = [
     "kr8s.*",
     "fastmcp.*",
+    "jq",
 ]
 ignore_missing_imports = true
 

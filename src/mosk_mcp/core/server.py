@@ -32,6 +32,7 @@ from mosk_mcp.privacy.middleware import create_privacy_middleware
 from mosk_mcp.registration.tools import (
     register_auth_tools,
     register_cluster_tools,
+    register_kubectl_tools,
     register_mcp_server_tools,
 )
 from mosk_mcp.registration.tool_groups import (
@@ -179,6 +180,10 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
     # Register tools with the shared context getter
     # We pass the get_server_context function instead of the context object itself
     enabled_tool_groups = resolve_tool_groups(settings.tools)
+    logger.info(
+        "tool_groups_configured",
+        **tool_group_registration_summary(enabled_tool_groups),
+    )
     _register_tools(mcp, settings, get_server_context, enabled_tool_groups)
 
     # Register tool execution logging middleware
@@ -226,13 +231,14 @@ def _register_tools(
     register_mcp_server_tools(mcp, settings, enabled_group_ids)
     register_auth_tools(mcp, settings, context_getter)
     register_cluster_tools(mcp, settings, context_getter)
+    register_kubectl_tools(mcp, settings, context_getter)
 
+    # Optional groups controlled by MCP_TOOLS (templates, ceph, rabbitmq, etc.)
     register_tool_groups(mcp, settings, context_getter, enabled_tool_groups)
 
     tools = registered_tool_names(mcp)
     logger.info(
-        "tool_groups_configured",
-        **tool_group_registration_summary(enabled_tool_groups),
+        "tools_registered",
         tools=tools,
         tool_count=len(tools),
     )
